@@ -9,13 +9,50 @@ import (
 
 
 type EventStore struct {
-	nextid *big.Int
+	nextId *big.Int
+	eventPublishers []chan StoredEvent
 }
 
 
-func (v *EventStore) Add(data []byte) string {
-	defer v.nextid.Add(v.nextid, big.NewInt(1))
-	return v.nextid.String()
+func (v *EventStore) RegisterPublishedEventsChannel(publisher chan StoredEvent) {
+	v.eventPublishers = append(v.eventPublishers, publisher)
+}
+
+
+// TODO: This function should take an Event
+func (v *EventStore) Add(event UnstoredEvent) (string, error) {
+	defer v.nextId.Add(v.nextId, big.NewInt(1))
+	// TODO: Implement storage
+	return v.nextId.String(), nil
+}
+
+
+func (v* EventStore) Close() error {
+	// TODO: Implement.
+	return nil
+}
+
+type UnstoredEvent struct {
+	Stream []byte
+	Data []byte
+}
+
+type StoredEvent struct {
+	Stream []byte
+	Id []byte
+	Data []byte
+}
+
+type QueryRequest struct {
+	StreamPrefix []byte
+	FromId []byte
+	ToId []byte
+}
+
+// TODO: Bundle all these parameters into a type
+func (v* EventStore) Query(req QueryRequest, res chan StoredEvent) {
+	// TODO: Implement
+	close(res)
 }
 
 
@@ -65,7 +102,7 @@ func NewEventStore(path string) (*EventStore, error) {
 		return nil, err
 	}
 	estore := new(EventStore)
-	estore.nextid = big.NewInt(0)
+	estore.nextId = big.NewInt(0)
 	// TODO: Open a database
 	return new(EventStore), nil
 }
