@@ -54,6 +54,7 @@ func runServer(estore *es.EventStore) {
 	loopServer(estore, evpubsock, commandsock)
 }
 
+// The result of an asynchronous zmq.Poll call.
 type zmqPollResult struct {
 	nbrOfChanges int
 	err error
@@ -67,6 +68,15 @@ func asyncPoll(notifier chan zmqPollResult, items zmq.PollItems) {
 	notifier <- zmqPollResult{a, b}
 }
 
+// The core ZeroMQ messaging loop. Handles requests and responses
+// asynchronously using the router socket. Every request is delegated to
+// a goroutine for maximum concurrency.
+//
+// `gozmq` does currently not support copy-free messages/frames. This means that
+// every message passing through this function needs to be copied
+// in-memory. If this becomes a bottleneck in the future, multiple
+// router sockets can be hooked to this final router to scale message
+// copying to multiple cores.
 func loopServer(estore *es.EventStore, evpubsock, frontend zmq.Socket) {
 	toPoll := zmq.PollItems{
 		zmq.PollItem{Socket: frontend, zmq.Events: zmq.POLLIN},
@@ -95,6 +105,10 @@ func loopServer(estore *es.EventStore, evpubsock, frontend zmq.Socket) {
 	}
 }
 
+// Publishes stored events to event listeners.
+//
+// Pops previously stored messages off a channel and published them to a
+// ZeroMQ socket.
 func publishAllSavedEvents(toPublish chan es.StoredEvent, evpub zmq.Socket) {
 	msg := make([][]byte, 3)
 	for {
@@ -111,7 +125,11 @@ func publishAllSavedEvents(toPublish chan es.StoredEvent, evpub zmq.Socket) {
 	}
 }
 
-
+// Handles a single ZeroMQ RES/REQ loop.
+//
+// The full request message stored in `msg` and the full ZeroMQ response
+// is pushed to `respchan`. The function does not return any error
+// because it is expected to be called asynchronously as a goroutine.
 func handleRequest(respchan chan [][]byte, estore *es.EventStore, msg [][]byte) {
 
 	// TODO: Rename to 'framelist'
@@ -214,6 +232,8 @@ func handleRequest(respchan chan [][]byte, estore *es.EventStore, msg [][]byte) 
 	}
 }
 
+// Convert a doubly linked list of message frames to a slice of message
+// frames.
 func listToFrames(l *list.List) [][]byte {
 	frames := make([][]byte, l.Len())
 	i := 0
@@ -223,12 +243,15 @@ func listToFrames(l *list.List) [][]byte {
 	return frames
 }
 
+// Helper function for copying a doubly linked list.
 func copyList(l *list.List) *list.List {
 	replica := list.New()
 	replica.PushBackList(l)
 	return replica
 }
 
+// Main method. Will panic if things are so bad that the application
+// will not start.
 func main() {
 	flag.Parse()
 
