@@ -22,11 +22,6 @@ var (
 	"tcp:127.0.0.1:9003", "ZeroMQ event publishing socket.")
 )
 
-const (
-	REQUEST_DEALER_ZPATH = "inproc://distributor"
-	WORKER_KILL_ZPATH = "inproc://worker-killer"
-)
-
 // Runs the server that distributes requests to workers.
 // Panics on error since it is an essential piece of code required to
 // run the application correctly.
