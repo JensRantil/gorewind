@@ -4,15 +4,28 @@ package eventstore
 
 import (
 	"errors"
+	"sync"
 	"math/big"
 	"os"
 	//"code.google.com/p/leveldb-go/leveldb"
 )
 
+const (
+	EVENT_ID_CHAN_SIZE = 100
+)
+
 // Instance of an event store. All of its functions are threadsafe.
 type EventStore struct {
-	nextId *big.Int
-	eventPublishers []chan StoredEvent
+	eventPublishersLock sync.RWMutex
+	// Using a map to avoid registering a channel multiple times
+	eventPublishers map[chan StoredEvent]chan StoredEvent
+
+	// A channel where we can make read event ID:s in a lock-free
+	// way.
+	eventIdChan chan string
+
+	// Write something to this channel to quit the generator
+	eventIdChanGeneratorShutdown chan bool
 }
 
 // An event that has not yet been persisted to disk.
@@ -38,25 +51,32 @@ type QueryRequest struct {
 // Register a channel where are published events will be pushed to.
 // Multiple channels can be registered.
 func (v *EventStore) RegisterPublishedEventsChannel(publisher chan StoredEvent) {
-	// TODO: Store this as a map to ensure that a channel is not
-	// registered multiple times.
 	// TODO: Implement an UnregisterPublishedEventsChannel.
-	// TODO: Make this function threadsafe.
-	v.eventPublishers = append(v.eventPublishers, publisher)
+	v.eventPublishersLock.Lock()
+	defer v.eventPublishersLock.Unlock()
+	v.eventPublishers[publisher] = publisher
 }
 
 // Store an event to the event store. Returns the unique event id that
 // the event was stored under. As long as no error occurred, of course.
 func (v *EventStore) Add(event UnstoredEvent) (string, error) {
-	// TODO: Implement storage
-	defer v.nextId.Add(v.nextId, big.NewInt(1))
-	return v.nextId.String(), nil
+	newId := <-v.eventIdChan
+	// TODO: Write to storage backend
+	storedEvent := StoredEvent{
+		Stream: event.Stream,
+		Id: []byte(newId),
+		Data: event.Data,
+	}
+	for pubchan := range v.eventPublishers {
+		pubchan <- storedEvent
+	}
+	return newId, nil
 }
 
 // Close an open event store. A previously closed event store must never
 // be used further.
 func (v* EventStore) Close() error {
-	// TODO: Implement.
+	v.eventIdChanGeneratorShutdown <- true
 	return nil
 }
 
@@ -110,13 +130,32 @@ func checkAndCreateDirPath(path string) error {
 	return nil
 }
 
+func startEventIdGenerator() (chan string, chan bool) {
+	// TODO: Allow nextId to be set explicitly based on what's
+	// previously been stored in the event store.
+	nextId := big.NewInt(0)
+	stopChan := make(chan bool)
+	idChan := make(chan string, EVENT_ID_CHAN_SIZE)
+	go func() {
+		for {
+			select {
+			case idChan <- nextId.String():
+				nextId.Add(nextId, big.NewInt(1))
+			case <-stopChan:
+				return
+			}
+		}
+	}()
+	return idChan, stopChan
+}
+
 // Create a new event store instance.
 func NewEventStore(path string) (*EventStore, error) {
 	if err := checkAndCreateDirPath(path); err != nil {
 		return nil, err
 	}
 	estore := new(EventStore)
-	estore.nextId = big.NewInt(0)
+	estore.eventIdChan, estore.eventIdChanGeneratorShutdown = startEventIdGenerator()
 	// TODO: Open a database
 	return new(EventStore), nil
 }
