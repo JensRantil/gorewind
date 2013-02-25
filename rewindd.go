@@ -255,7 +255,12 @@ func copyList(l *list.List) *list.List {
 func main() {
 	flag.Parse()
 
-	estore, err := es.NewEventStore(*eventStorePath)
+	desc, err := es.NewFileSystemDescriptor(*eventStorePath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "could not create event store Desc")
+		panic(err)
+	}
+	estore, err := es.NewEventStore(desc)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "could not create event store")
 		panic(err)

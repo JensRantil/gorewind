@@ -3,11 +3,14 @@
 package eventstore
 
 import (
-	"errors"
+	"bytes"
 	"sync"
 	"math/big"
-	"os"
+	"strconv"
 	//"code.google.com/p/leveldb-go/leveldb"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/descriptor"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 const (
@@ -26,6 +29,8 @@ type EventStore struct {
 
 	// Write something to this channel to quit the generator
 	eventIdChanGeneratorShutdown chan bool
+
+	db *leveldb.DB
 }
 
 // An event that has not yet been persisted to disk.
@@ -90,46 +95,6 @@ func (v* EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 }
 
 
-// Checks whether the given file or directory exists or not.
-func exists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil { return true, nil }
-	if os.IsNotExist(err) { return false, nil }
-	return false, err
-}
-
-
-// Checks whether the given path is a directory or not.
-func isDir(path string) (bool, error) {
-	fstat, err := os.Stat(path)
-	if err == nil && fstat.IsDir() {
-		return true, nil
-	}
-	return false, err
-}
-
-// Create a directory if it does not exist.
-func checkAndCreateDirPath(path string) error {
-	exists, err := exists(path)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		os.MkdirAll(path, 0700)
-	}
-
-	// deliberately checking if directory was created correctly
-	// here. Might as well...
-	isdir, err := isDir(path)
-	if err != nil {
-		return err
-	}
-	if !isdir {
-		return errors.New("the event store path is not a directory")
-	}
-	return nil
-}
-
 func startEventIdGenerator() (chan string, chan bool) {
 	// TODO: Allow nextId to be set explicitly based on what's
 	// previously been stored in the event store.
@@ -149,14 +114,112 @@ func startEventIdGenerator() (chan string, chan bool) {
 	return idChan, stopChan
 }
 
-// Create a new event store instance.
-func NewEventStore(path string) (*EventStore, error) {
-	if err := checkAndCreateDirPath(path); err != nil {
-		return nil, err
-	}
-	estore := new(EventStore)
-	estore.eventIdChan, estore.eventIdChanGeneratorShutdown = startEventIdGenerator()
-	// TODO: Open a database
-	return new(EventStore), nil
+type EStoreDescriptor descriptor.Desc
+
+// Create a new file system based descriptor
+func NewFileSystemDescriptor(path string) (EStoreDescriptor, error) {
+	return descriptor.OpenFile(path)
 }
 
+// Create a new event store instance.
+func NewEventStore(desc EStoreDescriptor) (*EventStore, error) {
+	estore := new(EventStore)
+	estore.eventIdChan, estore.eventIdChanGeneratorShutdown = startEventIdGenerator()
+
+	options := &opt.Options{
+		Flag: opt.OFCreateIfMissing,
+		Comparer: &EventStreamComparer{},
+	}
+	db, err := leveldb.Open(desc, options)
+	if err != nil {
+		return nil, err
+	}
+	estore.db = db
+
+	return estore, nil
+}
+
+// Helper functions for comparer
+
+// Keys are like this: group:string/byte:strInteger
+var groupSep []byte = []byte(":")
+
+func getGroup(key []byte) []byte {
+	return bytes.SplitN(key, groupSep, 1)[0]
+}
+
+func getRealKey(key []byte) []byte {
+	pieces := bytes.Split(key, groupSep)
+	if _, err := getIntegerPart(key); err != nil {
+		return bytes.Join(pieces[1:len(pieces)], groupSep)
+	}
+	return bytes.Join(pieces[1:len(pieces) - 1], groupSep)
+}
+
+func getIntegerPart(key []byte) (int, error) {
+	pieces := bytes.Split(key, groupSep)
+	lastpiece := pieces[len(pieces) - 1]
+	i, err := strconv.Atoi(string(lastpiece))
+	if err != nil {
+		return 0, err
+	}
+	return i, nil
+}
+
+// Comparer
+
+type EventStreamComparer struct {
+}
+
+func (v* EventStreamComparer) Name() string {
+	return "rewindd.eventStreamComparer"
+}
+
+func (v* EventStreamComparer) Separator(a, b []byte) []byte {
+	// TODO: Optimize
+	return a
+}
+
+func (v* EventStreamComparer) Successor(b []byte) []byte {
+	// TODO: Optimize
+	return b
+}
+
+func (v* EventStreamComparer) Compare(a, b []byte) int {
+	groupA := getGroup(a)
+	groupB := getGroup(b)
+	if c := bytes.Compare(groupA, groupB); c != 0 {
+		return c
+	}
+
+	realKeyA := getRealKey(a)
+	realKeyB := getRealKey(b)
+	if c := bytes.Compare(realKeyA, realKeyB); c != 0 {
+		return c
+	}
+
+	intPartA, errA := getIntegerPart(a)
+	intPartB, errB := getIntegerPart(b)
+	switch {
+	case errA == nil && errB == nil:
+		// [Group, key, intA] </>/= [Group, key, intB]
+		switch {
+		case intPartA < intPartB:
+			return -1
+		case intPartA > intPartB:
+			return 1
+		default:
+			return 0
+		}
+	case errA != nil && errB != nil:
+		// [Group, key] == [Group, key]
+		return 0
+	case errA != nil:
+		// [Group, key, int] > [Group, key]
+		return 1
+	}
+	//default: -- must be put outside of switch to avoid compiler
+	//error.
+	// [Group, key] < [Group, key, int]
+	return -1
+}
