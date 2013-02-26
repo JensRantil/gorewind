@@ -4,6 +4,8 @@ package eventstore
 
 import (
 	"testing"
+
+	"bytes"
 )
 
 
@@ -13,6 +15,34 @@ type compareTest struct {
 	expectedResult int
 }
 
+func testComparater(t *testing.T, test compareTest, c EventStreamComparer) {
+	testComparator(t, test, c)
+	testSeparator(t, test, c)
+	testSuccessor(t, test.a, c)
+	testSuccessor(t, test.b, c)
+}
+
+func testSeparator(t *testing.T, test compareTest, c EventStreamComparer) {
+	ba := []byte(test.a)
+	bb := []byte(test.b)
+	res := c.Separator(ba, bb)
+	diff := c.Compare(ba, bb)
+	if diff >= 0 && bytes.Compare(res, ba) != 0 {
+		t.Errorf("Separator was modified when it shouldn't.")
+		t.Errorf("a: %s", test.a)
+		t.Errorf("b: %s", test.b)
+	}
+	if len(res) > len(ba) {
+		t.Errorf("a was lengthened, not shortened.")
+	}
+	if c.Compare(ba, res) > 0 {
+		t.Errorf("The Separator was less than 'a'.")
+	}
+	if c.Compare(bb, res) <= 0 {
+		t.Errorf("The Separator was >= 'a'.")
+	}
+}
+
 func testComparator(t *testing.T, test compareTest, comparer EventStreamComparer) {
 	res := comparer.Compare([]byte(test.a), []byte(test.b))
 	if res != test.expectedResult {
@@ -20,6 +50,17 @@ func testComparator(t *testing.T, test compareTest, comparer EventStreamComparer
 		t.Errorf("b: %s", test.b)
 		t.Errorf("Output was %d. Expected: %d", res,
 			test.expectedResult)
+	}
+}
+
+func testSuccessor(t *testing.T, s string, comparer EventStreamComparer) {
+	bs := []byte(s)
+	shorter := comparer.Successor(bs)
+	if len(shorter) > len(bs) {
+		t.Error("Successor was longer: %s", s)
+	}
+	if comparer.Compare(shorter, bs) < 0 {
+		t.Error("Successor was greater the its origin: %s", s)
 	}
 }
 

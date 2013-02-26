@@ -10,6 +10,7 @@ import (
 	//"code.google.com/p/leveldb-go/leveldb"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/descriptor"
+	"github.com/syndtr/goleveldb/leveldb/comparer"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
@@ -175,11 +176,65 @@ func (v* EventStreamComparer) Name() string {
 	return "rewindd.eventStreamComparer"
 }
 
+// If 'a' < 'b', changes 'a' to a short string in [a,b).
+//
+// Used to minimize the size of index blocks and other data structures.
 func (v* EventStreamComparer) Separator(a, b []byte) []byte {
-	// TODO: Optimize
+	groupA := getGroup(a)
+	groupB := getGroup(b)
+	if c := bytes.Compare(groupA, groupB); c != 0 {
+		bcomp := comparer.BytesComparer{}
+		return bytes.Join([][]byte{
+			bcomp.Separator(groupA, groupB),
+			[]byte{},
+		}, groupSep)
+	}
+	// Here we know that groupA==groupB
+
+	realKeyA := getRealKey(a)
+	realKeyB := getRealKey(b)
+	if c := bytes.Compare(realKeyA, realKeyB); c != 0 {
+		bcomp := comparer.BytesComparer{}
+		return bytes.Join([][]byte{
+			groupA,
+			bcomp.Separator(realKeyA, realKeyA),
+		}, groupSep)
+	}
+	// Here we know that realKeyA==realKeyB
+
+	// TODO: Handle this
+	/*intPartA, errA := getIntegerPart(a)
+	intPartB, errB := getIntegerPart(b)
+	switch {
+	case errA == nil && errB == nil:
+		// [Group, key, intA] </>/= [Group, key, intB]
+		switch {
+		case intPartA < intPartB:
+			return -1
+		case intPartA > intPartB:
+			return 1
+		default:
+			return 0
+		}
+	case errA != nil && errB != nil:
+		// [Group, key] == [Group, key]
+		return 0
+	case errA != nil:
+		// [Group, key, int] > [Group, key]
+		return 1
+	}
+	//default: -- must be put outside of switch to avoid compiler
+	//error.
+	// [Group, key] < [Group, key, int]
+	return -1*/
+
+	// Unoptimized result that always works.
 	return a
 }
 
+// Changes 'b' to a short string >= 'b'
+//
+// Used to minimize the size of index blocks and other data structures.
 func (v* EventStreamComparer) Successor(b []byte) []byte {
 	// TODO: Optimize
 	return b
