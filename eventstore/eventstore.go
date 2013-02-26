@@ -203,30 +203,38 @@ func (v* EventStreamComparer) Separator(a, b []byte) []byte {
 	// Here we know that realKeyA==realKeyB
 
 	// TODO: Handle this
-	/*intPartA, errA := getIntegerPart(a)
+	intPartA, errA := getIntegerPart(a)
 	intPartB, errB := getIntegerPart(b)
 	switch {
 	case errA == nil && errB == nil:
 		// [Group, key, intA] </>/= [Group, key, intB]
 		switch {
 		case intPartA < intPartB:
-			return -1
-		case intPartA > intPartB:
-			return 1
+			return bytes.Join([][]byte{
+				groupA,
+				realKeyA,
+				[]byte(strconv.Itoa(intPartB - 1)),
+			}, groupSep)
+		/*case intPartA > intPartB:
+			return a*/
 		default:
-			return 0
+			return a
 		}
 	case errA != nil && errB != nil:
 		// [Group, key] == [Group, key]
-		return 0
+		return a
 	case errA != nil:
 		// [Group, key, int] > [Group, key]
-		return 1
+		return a
 	}
 	//default: -- must be put outside of switch to avoid compiler
 	//error.
 	// [Group, key] < [Group, key, int]
-	return -1*/
+	return bytes.Join([][]byte{
+		groupA,
+		realKeyA,
+		[]byte("1"),
+	}, groupSep)
 
 	// Unoptimized result that always works.
 	return a
