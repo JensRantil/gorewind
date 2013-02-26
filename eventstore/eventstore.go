@@ -236,8 +236,12 @@ func (v* EventStreamComparer) Separator(a, b []byte) []byte {
 //
 // Used to minimize the size of index blocks and other data structures.
 func (v* EventStreamComparer) Successor(b []byte) []byte {
-	// TODO: Optimize
-	return b
+	groupB := getGroup(b)
+	bcomp := comparer.BytesComparer{}
+	return bytes.Join([][]byte{
+		bcomp.Successor(groupB),
+		[]byte{},
+	}, groupSep)
 }
 
 func (v* EventStreamComparer) Compare(a, b []byte) int {
