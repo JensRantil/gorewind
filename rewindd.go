@@ -19,7 +19,7 @@ var (
 	"tcp://127.0.0.1:9002", "Command socket. Handles new eventsand"+
 	" queries.")
 	eventPublishZPath = flag.String("evpubsocket",
-	"tcp:127.0.0.1:9003", "ZeroMQ event publishing socket.")
+	"tcp://127.0.0.1:9003", "ZeroMQ event publishing socket.")
 )
 
 // Runs the server that distributes requests to workers.
