@@ -11,3 +11,5 @@ storage backend will be supported (LevelDB).
 The implementation is written in the Go programming language.
 
 Currently, this project is highly experimental and alpha.
+
+I'll try to stick to http://www.semver.org when it comes to versioning.
