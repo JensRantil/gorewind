@@ -180,8 +180,20 @@ func handleRequest(respchan chan [][]byte, estore *es.EventStore, msg [][]byte) 
 				Stream: estream.([]byte),
 				Data: data.([]byte),
 			}
-			estore.Add(newevent)
-			// TODO: Send response
+			err := estore.Add(newevent)
+			if err != nil {
+				// TODO: Migrate to logging system
+				fmt.Println(err.String())
+
+				response := copyList(resptemplate)
+				response.PushBack([]byte("ERROR " + err))
+				respchan <- listToFrames(response)
+			} else {
+				// the event was added
+				response := copyList(resptemplate)
+				response.PushBack([]byte("PUBLISHED"))
+				respchan <- listToFrames(response)
+			}
 		}
 	case "QUERY":
 		parts.Remove(parts.Front())
