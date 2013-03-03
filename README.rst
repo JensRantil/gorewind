@@ -2,8 +2,12 @@
 Rewind in Go
 ============
 
-This is a port of `Rewind`_ to the Go programming language.
+This is the next version of `Rewind`_. The intention is to bring higher
+concurrency and support for multiple streams. Initially only a single
+storage backend will be supported (LevelDB).
 
 .. _Rewind: https://github.com/JensRantil/rewind
+
+The implementation is written in the Go programming language.
 
 Currently, this project is highly experimental and alpha.
