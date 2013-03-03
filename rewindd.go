@@ -180,18 +180,20 @@ func handleRequest(respchan chan [][]byte, estore *es.EventStore, msg [][]byte) 
 				Stream: estream.([]byte),
 				Data: data.([]byte),
 			}
-			err := estore.Add(newevent)
+			newId, err := estore.Add(newevent)
 			if err != nil {
 				// TODO: Migrate to logging system
-				fmt.Println(err.String())
+				sErr := err.Error()
+				fmt.Println(sErr)
 
 				response := copyList(resptemplate)
-				response.PushBack([]byte("ERROR " + err))
+				response.PushBack([]byte("ERROR " + sErr))
 				respchan <- listToFrames(response)
 			} else {
 				// the event was added
 				response := copyList(resptemplate)
 				response.PushBack([]byte("PUBLISHED"))
+				response.PushBack([]byte(newId))
 				respchan <- listToFrames(response)
 			}
 		}
