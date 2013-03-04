@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"container/list"
 	"os"
-	es "github.com/jensrantil/rewindd/eventstore"
+	es "github.com/jensrantil/gorewind/eventstore"
 	zmq "github.com/alecthomas/gozmq"
 )
 
