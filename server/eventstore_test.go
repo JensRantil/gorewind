@@ -1,10 +1,9 @@
 // Tests for rewindd/eventstore
-package eventstore
+package server
 
 
 import (
 	"testing"
-
 	"bytes"
 )
 

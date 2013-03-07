@@ -1,6 +1,6 @@
 // Deals with persisting events to disk and querying them. No network is
 // involved in any of the code in this package.
-package eventstore
+package server
 
 import (
 	"bytes"
@@ -115,15 +115,8 @@ func startEventIdGenerator() (chan string, chan bool) {
 	return idChan, stopChan
 }
 
-type EStoreDescriptor descriptor.Desc
-
-// Create a new file system based descriptor
-func NewFileSystemDescriptor(path string) (EStoreDescriptor, error) {
-	return descriptor.OpenFile(path)
-}
-
 // Create a new event store instance.
-func NewEventStore(desc EStoreDescriptor) (*EventStore, error) {
+func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 	estore := new(EventStore)
 	estore.eventIdChan, estore.eventIdChanGeneratorShutdown = startEventIdGenerator()
 
