@@ -1,4 +1,3 @@
-// Tests for rewindd/eventstore
 package server
 
 

@@ -1,3 +1,4 @@
+// GoRewind is an event store server written in Go that talks ZeroMQ.
 package main
 
 import (

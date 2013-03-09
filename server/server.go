@@ -1,3 +1,5 @@
+// Contains the server loop. Deals with incoming requests and delegates
+// them to the event store.
 package server
 
 import (
