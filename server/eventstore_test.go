@@ -56,10 +56,10 @@ func testSuccessor(t *testing.T, s string, comparer EventStreamComparer) {
 	bs := []byte(s)
 	shorter := comparer.Successor(bs)
 	if len(shorter) > len(bs) {
-		t.Error("Successor was longer: %s", s)
+		t.Errorf("Successor was longer: %s", s)
 	}
 	if comparer.Compare(shorter, bs) < 0 {
-		t.Error("Successor was greater the its origin: %s", s)
+		t.Errorf("Successor was greater the its origin: %s", s)
 	}
 }
 
