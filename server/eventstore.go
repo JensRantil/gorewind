@@ -63,13 +63,6 @@ type StoredEvent struct {
 	Data []byte
 }
 
-// A query request.
-type QueryRequest struct {
-	StreamPrefix []byte
-	FromId []byte
-	ToId []byte
-}
-
 // Register a channel where are published events will be pushed to.
 // Multiple channels can be registered.
 func (v *EventStore) RegisterPublishedEventsChannel(publisher chan StoredEvent) {
@@ -128,6 +121,13 @@ func (v *EventStore) Add(event UnstoredEvent) (string, error) {
 func (v* EventStore) Close() error {
 	v.eventIdChanGeneratorShutdown <- true
 	return nil
+}
+
+// A query request.
+type QueryRequest struct {
+	Stream []byte
+	FromId []byte
+	ToId []byte
 }
 
 // Query events from an event store. If the request is malformed in any
