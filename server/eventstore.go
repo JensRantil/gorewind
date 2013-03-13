@@ -177,10 +177,11 @@ func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 	return estore, nil
 }
 
-// Helper functions for comparer
-
 // Keys are like this: group:string/byte:strInteger
 var groupSep []byte = []byte(":")
+
+
+// Helper functions for comparer
 
 func getGroup(key []byte) []byte {
 	return bytes.SplitN(key, groupSep, 1)[0]
