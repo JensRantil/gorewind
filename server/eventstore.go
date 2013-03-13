@@ -79,11 +79,39 @@ func (v *EventStore) RegisterPublishedEventsChannel(publisher chan StoredEvent) 
 	v.eventPublishers[publisher] = publisher
 }
 
+var streamPrefix []byte = []byte("stream")
+var eventPrefix []byte = []byte("event")
+
 // Store an event to the event store. Returns the unique event id that
 // the event was stored under. As long as no error occurred, of course.
 func (v *EventStore) Add(event UnstoredEvent) (string, error) {
 	newId := <-v.eventIdChan
-	// TODO: Write to storage backend
+
+	batch := new(leveldb.Batch)
+
+	// TODO: Benchmark how much impact this write has. We could also
+	// check if it exists and not write it in that case, which is
+	// probably faster. Especially if we are using bloom filter.
+	// TODO: Rewrite to use eventStoreKey
+	streamKeyParts := [][]byte{streamPrefix, event.Stream}
+	streamKey := bytes.Join(streamKeyParts, []byte(""))
+	batch.Put(streamKey, []byte(""))
+
+	evKeyParts := [][]byte{
+		eventPrefix,
+		event.Stream,
+		[]byte(":"),
+		[]byte(newId),
+	}
+	evKey := bytes.Join(evKeyParts, []byte(""))
+	batch.Put(evKey, event.Data)
+
+	wo := &opt.WriteOptions{}
+	err := v.db.Write(batch, wo)
+	if err != nil {
+		return "", err
+	}
+
 	storedEvent := StoredEvent{
 		Stream: event.Stream,
 		Id: []byte(newId),
