@@ -19,6 +19,7 @@ package server
 
 import (
 	"testing"
+	"testing/quick"
 	"bytes"
 )
 
@@ -114,3 +115,101 @@ func TestComparator(t *testing.T) {
 	}
 }
 
+type evStoreKeySerTest struct {
+	origin string,
+	group string,
+	key string,
+	keyId *big.Int,
+}
+
+func TestEventStoreKeySerialization(t *testing.T) {
+	f := func(groupId, key []byte, keyId int) bool {
+		// GroupId must not contain any :
+		bytes.Replace(groupId, ":", "", -1)
+
+		keyIdBytes := []byte(strconv.Itoa(keyId))
+		data := bytes.Join([]byte{
+			groupId,
+			key,
+			keyIdBytes,
+		}, []byte(":"))
+
+		parsedAndSerialized := newEventStoreKey(data).bytes()
+		return bytes.Compare(parsedAndSerialized, bytes) == 0
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error("QuickTest failed:", err)
+	}
+
+	tests := []evStoreKeySerTest{
+		evStoreKeySerTest{
+			"g:a",
+			"g",
+			"a",
+			nil,
+		},
+		evStoreKeySerTest{
+			"g:a:1"
+			"g",
+			"a",
+			big.NewInt(1),
+		},
+		// Test cases where there are multiple colon keys in the
+		// middle.
+		evStoreKeySerTest{
+			"g:a:b:1"
+			"g",
+			"a:b",
+			big.NewInt(1),
+		},
+		evStoreKeySerTest{
+			"g:a:b"
+			"g",
+			"a:b",
+			nil
+		},
+		evStoreKeySerTest{
+			"h:a:b:2"
+			"h",
+			"a:b",
+			big.NewInt(2),
+		},
+		evStoreKeySerTest{
+			"h:a:b:c1"
+			"h",
+			"a:b:c1",
+			nil
+		},
+		evStoreKeySerTest{
+			"h:a:b:11"
+			"h",
+			"a:b",
+			big.NewInt(11),
+		},
+	}
+	for _, test := range tests {
+		key := newEventStoreKey([]byte(test.origin))
+		if bytes.Compare(key.groupKey, []byte(test.group) != 0 {
+			t.Error("Wrong groupkey for:", test.origin)
+			t.Error("Expected:", test.group)
+			t.Error("Got:     ", test.groupKey)
+		}
+		if bytes.Compare(key.key, []byte(test.key) != 0 {
+			t.Error("Wrong key for:", test.origin)
+			t.Error("Expected:", test.group)
+			t.Error("Got:     ", test.groupKey)
+		}
+		switch {
+		case test.keyId != nil && key.keyId == nil:
+			t.Error("KeyId was nil, not expected.")
+		case test.keyId == nil && key.keyId != nil:
+			t.Error("KeyId was not nil, expected it to be.")
+		case test.keyId != nil && key.keyId != nil:
+			if test.keyId.Cmp(key.keyId) != 0 {
+				t.Error("Wrong keyId.")
+				t.Error("Expected:", test.keyId.String())
+				t.Error("Was:     ", key.keyId.String())
+			}
+	}
+
+}
