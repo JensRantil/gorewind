@@ -27,6 +27,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/descriptor"
 	"github.com/syndtr/goleveldb/leveldb/comparer"
+	iter "github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
@@ -133,10 +134,88 @@ type QueryRequest struct {
 // Query events from an event store. If the request is malformed in any
 // way, an error is returned. Otherwise, the query result is streamed
 // through the res channel in chronological order.
-func (v* EventStore) Query(req QueryRequest, res chan StoredEvent) error {
-	// TODO: Implement
-	close(res)
+//
+// Currently this function will make error checks synchronously.  If all
+// looks good, streaming the results through `res` is done
+// asynchronously. TODO: Also make the error checking asynchronously, to
+// minimize IO blocking when calling this function.
+func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
+	ro := &opt.ReadOptions{}
+	it := v.db.NewIterator(ro)
+
+	// To key
+	seekKey := eventStoreKey{
+		streamPrefix,
+		req.Stream
+		req.toId,
+	}
+	toKeyBytes = seekKey.toBytes()
+	it.Seek(toKeyBytes)
+	if bytes.Compare(toKeyBytes, it.Key() != 0 {
+		bToId := []byte(toId)
+		msg := fmt.SPrint("to key did not exist:", bToId)
+		return errors.New(msg)
+	}
+
+	// From key
+	seekKey := eventStoreKey{
+		streamPrefix,
+		req.Stream
+		req.fromId,
+	}
+	fromKeyBytes = seekKey.toBytes()
+	it.Seek(fromKeyBytes)
+	if bytes.Compare(fromKeyBytes, it.Key() != 0 {
+		bFromId := []byte(fromId)
+		msg := fmt.SPrint("from key did not exist:", bFromId)
+		return errors.New(msg)
+	}
+
+	diff := EventStreamComparer.Compare(fromKeyBytes, toKeyBytes)
+	if diff >= -1 {
+		msg := "The query was done in wrong chronological order."
+		return errors.New(msg)
+	}
+
+	go safeQuery(it, req, res)
+
 	return nil
+}
+
+// Make the actual query. Sanity checks of the iterator i is expected to
+// have been done before calling this function.
+func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) error {
+	if !i.Next() {
+		// Querying should never return the fromKey, but be
+		// inclusive when it comes to the last one. This is
+		// natural, since the querier is expected to previouslye
+		// have seen fromId, and the goal is to reach the state
+		// of toId.
+		return
+	}
+	for i.Next() {
+		curKey := neweventStoreKey(i.Key())
+		if bytes.Compare(curKey.groupKey, streamPrefix) != 0 {
+			break
+		}
+
+		resEvent := {
+			curKey.groupKey,
+			curKey.key,
+			[]byte(curKey.keyId.String()),
+		}
+		res <- resEvent
+
+		if bytes.Compare(curKey.key, req.stream) != 0 {
+			break
+		}
+		keyId := []byte(curKey.keyId.String())
+		if bytes.Compare(req.toId, keyId) == 0 {
+			break
+		}
+	}
+
+	close(res)
 }
 
 
