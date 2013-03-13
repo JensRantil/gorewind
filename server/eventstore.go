@@ -177,9 +177,83 @@ func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 	return estore, nil
 }
 
-// Keys are like this: group:string/byte:strInteger
+// The separator used for separating into the different eventStoreKey
+// fields.
 var groupSep []byte = []byte(":")
 
+// Represents a leveldb key.
+type eventStoreKey struct {
+	groupKey []byte
+	key []byte
+	keyId *big.Int
+}
+
+// Convert a eventStoreKey to bytes. The returned byte slice is either
+// "groupKey:key:keyId" if keyId is non-nil, or "groupKey:key"
+// otherwise.
+func (v *eventStoreKey) toBytes() []byte {
+	var pieces [][]byte
+	if v.keyId != nil {
+		pieces = make([][]byte, 3)
+		pieces[0] = v.groupKey
+		pieces[1] = v.key
+		pieces[2] = []byte(v.keyId.String())
+	} else {
+		pieces = make([][]byte, 2)
+		pieces[0] = v.groupKey
+		pieces[1] = v.key
+	}
+	return bytes.Join(pieces, groupSep)
+
+}
+
+// Convert a byte slice to a parsed eventStoreKey.
+func neweventStoreKey(data []byte) (*eventStoreKey) {
+	res := new(eventStoreKey)
+	pieces := bytes.Split(data, groupSep)
+	if len(pieces) > 2 {
+		possibleId := big.NewInt(0)
+		_, success := possibleId.SetString(string(pieces[len(pieces)-1]), 10)
+		if success {
+			res.keyId = possibleId
+		}
+	}
+	if len(pieces) > 0 {
+		res.groupKey = pieces[0]
+	}
+	if len(pieces) > 1 {
+		var upperIndex int
+		if res.keyId != nil {
+			upperIndex = len(pieces) - 1
+		} else {
+			upperIndex = len(pieces)
+		}
+		keyPieces := pieces[1:upperIndex]
+		res.key = bytes.Join(pieces, groupSep)
+	}
+	return res
+}
+
+// Compare to another eventStoreKey. Returns -1 if this one is smaller
+// than o2, 0 same, or 1 is this one is bigger than the previous one.
+func (o1 *eventStoreKey) compare(o2 *eventStoreKey) int {
+	if diff := bytes.Compare(o1.groupKey, o2.groupKey); diff != 0 {
+		return diff
+	}
+	if diff := bytes.Compare(o1.key, o2.key); diff != 0 {
+		return diff
+	}
+	switch {
+	case o1.keyId != nil && o2.keyId != nil:
+		return o1.keyId.Cmp(o2.keyId)
+	case o1.keyId != nil:
+		return 1
+	case o2.keyId != nil:
+		return -1
+	default:
+		return 0
+	}
+}
 
 // Helper functions for comparer
 
