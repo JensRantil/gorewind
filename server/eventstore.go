@@ -140,10 +140,15 @@ func (v* EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 }
 
 
-func startEventIdGenerator() (chan string, chan bool) {
+func startEventIdGenerator(initId *string) (chan string, chan bool) {
 	// TODO: Allow nextId to be set explicitly based on what's
 	// previously been stored in the event store.
 	nextId := big.NewInt(0)
+	if initId != nil {
+		nextId.SetString(*initId, 10)
+		// We do not care if this succeeded. Instead, we simply
+		// initialize with zero (0).
+	}
 	stopChan := make(chan bool)
 	idChan := make(chan string, EVENT_ID_CHAN_SIZE)
 	go func() {
@@ -162,7 +167,12 @@ func startEventIdGenerator() (chan string, chan bool) {
 // Create a new event store instance.
 func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 	estore := new(EventStore)
-	estore.eventIdChan, estore.eventIdChanGeneratorShutdown = startEventIdGenerator()
+
+	// TODO: Initialize the eventid generator with maxId+1
+	initId := "0"
+	idChan, idChanShutdown := startEventIdGenerator(&initId)
+	estore.eventIdChan = idChan
+	estore.eventIdChanGeneratorShutdown = idChanShutdown
 
 	options := &opt.Options{
 		Flag: opt.OFCreateIfMissing,
