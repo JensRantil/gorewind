@@ -259,7 +259,7 @@ func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 
 			events := make(chan StoredEvent)
 			req := QueryRequest{
-				StreamPrefix: estreamprefix.([]byte),
+				Stream: estreamprefix.([]byte),
 				FromId: fromid.([]byte),
 				ToId: toid.([]byte),
 			}

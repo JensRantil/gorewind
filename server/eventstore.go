@@ -20,6 +20,8 @@ package server
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"sync"
 	"math/big"
 	"strconv"
@@ -144,34 +146,46 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 	it := v.db.NewIterator(ro)
 
 	// To key
+	sToId := string(req.ToId)
+	toId, success := big.NewInt(0).SetString(sToId, 10)
+	if !success {
+		msg := fmt.Sprint("to key id was malformed:", sToId)
+		return errors.New(msg)
+	}
 	seekKey := eventStoreKey{
 		streamPrefix,
-		req.Stream
-		req.toId,
+		req.Stream,
+		toId,
 	}
-	toKeyBytes = seekKey.toBytes()
+	toKeyBytes := seekKey.toBytes()
 	it.Seek(toKeyBytes)
-	if bytes.Compare(toKeyBytes, it.Key() != 0 {
-		bToId := []byte(toId)
-		msg := fmt.SPrint("to key did not exist:", bToId)
+	if bytes.Compare(toKeyBytes, it.Key()) != 0 {
+		bToId := string(toKeyBytes)
+		msg := fmt.Sprint("to key did not exist:", bToId)
 		return errors.New(msg)
 	}
 
 	// From key
-	seekKey := eventStoreKey{
-		streamPrefix,
-		req.Stream
-		req.fromId,
+	sFromId := string(req.ToId)
+	fromId, success := big.NewInt(0).SetString(sFromId, 10)
+	if !success {
+		msg := fmt.Sprint("from key id was malformed:", sFromId)
+		return errors.New(msg)
 	}
-	fromKeyBytes = seekKey.toBytes()
+	seekKey = eventStoreKey{
+		streamPrefix,
+		req.Stream,
+		fromId,
+	}
+	fromKeyBytes := seekKey.toBytes()
 	it.Seek(fromKeyBytes)
-	if bytes.Compare(fromKeyBytes, it.Key() != 0 {
-		bFromId := []byte(fromId)
-		msg := fmt.SPrint("from key did not exist:", bFromId)
+	if bytes.Compare(fromKeyBytes, it.Key()) != 0 {
+		bFromId := string(fromKeyBytes)
+		msg := fmt.Sprint("from key did not exist:", bFromId)
 		return errors.New(msg)
 	}
 
-	diff := EventStreamComparer.Compare(fromKeyBytes, toKeyBytes)
+	diff := new(EventStreamComparer).Compare(fromKeyBytes, toKeyBytes)
 	if diff >= -1 {
 		msg := "The query was done in wrong chronological order."
 		return errors.New(msg)
@@ -184,38 +198,29 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 
 // Make the actual query. Sanity checks of the iterator i is expected to
 // have been done before calling this function.
-func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) error {
-	if !i.Next() {
-		// Querying should never return the fromKey, but be
-		// inclusive when it comes to the last one. This is
-		// natural, since the querier is expected to previouslye
-		// have seen fromId, and the goal is to reach the state
-		// of toId.
-		return
-	}
+func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
+	defer close(res)
 	for i.Next() {
 		curKey := neweventStoreKey(i.Key())
 		if bytes.Compare(curKey.groupKey, streamPrefix) != 0 {
 			break
 		}
 
-		resEvent := {
+		resEvent := StoredEvent{
 			curKey.groupKey,
 			curKey.key,
 			[]byte(curKey.keyId.String()),
 		}
 		res <- resEvent
 
-		if bytes.Compare(curKey.key, req.stream) != 0 {
+		if bytes.Compare(curKey.key, req.Stream) != 0 {
 			break
 		}
 		keyId := []byte(curKey.keyId.String())
-		if bytes.Compare(req.toId, keyId) == 0 {
+		if bytes.Compare(req.ToId, keyId) == 0 {
 			break
 		}
 	}
-
-	close(res)
 }
 
 
@@ -312,13 +317,14 @@ func neweventStoreKey(data []byte) (*eventStoreKey) {
 	}
 	if len(pieces) > 1 {
 		var upperIndex int
+		// TODO: Handle the case when len(pieces)>=max(int)
 		if res.keyId != nil {
 			upperIndex = len(pieces) - 1
 		} else {
 			upperIndex = len(pieces)
 		}
 		keyPieces := pieces[1:upperIndex]
-		res.key = bytes.Join(pieces, groupSep)
+		res.key = bytes.Join(keyPieces, groupSep)
 	}
 	return res
 }
@@ -339,9 +345,8 @@ func (o1 *eventStoreKey) compare(o2 *eventStoreKey) int {
 		return 1
 	case o2.keyId != nil:
 		return -1
-	default:
-		return 0
 	}
+	return 0
 }
 
 // Helper functions for comparer
