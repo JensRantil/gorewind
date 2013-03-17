@@ -38,8 +38,9 @@ type Server struct {
 	context *zmq.Context
 }
 
-// Main method. Will panic if things are so bad that the application
-// will not start.
+// Initialize a new event store server and return a handle to it. The
+// event store is not started. It's upp to the caller to execute Run()
+// on the server handle.
 func New(params *InitParams) (*Server, error) {
 	// TODO: Assert params.Store is not nil
 	server := Server{
