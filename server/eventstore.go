@@ -53,6 +53,29 @@ type EventStore struct {
 	db *leveldb.DB
 }
 
+// Create a new event store instance.
+func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
+	estore := new(EventStore)
+
+	// TODO: Initialize the eventid generator with maxId+1
+	initId := "0"
+	idChan, idChanShutdown := startEventIdGenerator(&initId)
+	estore.eventIdChan = idChan
+	estore.eventIdChanGeneratorShutdown = idChanShutdown
+
+	options := &opt.Options{
+		Flag: opt.OFCreateIfMissing,
+		Comparer: &EventStreamComparer{},
+	}
+	db, err := leveldb.Open(desc, options)
+	if err != nil {
+		return nil, err
+	}
+	estore.db = db
+
+	return estore, nil
+}
+
 // An event that has not yet been persisted to disk.
 type UnstoredEvent struct {
 	Stream []byte
@@ -246,29 +269,6 @@ func startEventIdGenerator(initId *string) (chan string, chan bool) {
 		}
 	}()
 	return idChan, stopChan
-}
-
-// Create a new event store instance.
-func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
-	estore := new(EventStore)
-
-	// TODO: Initialize the eventid generator with maxId+1
-	initId := "0"
-	idChan, idChanShutdown := startEventIdGenerator(&initId)
-	estore.eventIdChan = idChan
-	estore.eventIdChanGeneratorShutdown = idChanShutdown
-
-	options := &opt.Options{
-		Flag: opt.OFCreateIfMissing,
-		Comparer: &EventStreamComparer{},
-	}
-	db, err := leveldb.Open(desc, options)
-	if err != nil {
-		return nil, err
-	}
-	estore.db = db
-
-	return estore, nil
 }
 
 // The separator used for separating into the different eventStoreKey
