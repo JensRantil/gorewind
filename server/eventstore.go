@@ -56,6 +56,8 @@ type EventStore struct {
 // Create a new event store instance.
 func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 	estore := new(EventStore)
+	ePublishers := make(map[chan StoredEvent]chan StoredEvent)
+	estore.eventPublishers = ePublishers
 
 	// TODO: Initialize the eventid generator with maxId+1
 	initId := "0"
