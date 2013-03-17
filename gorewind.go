@@ -66,7 +66,7 @@ func main() {
 		Store: estore,
 	}
 	serv, err := server.New(&initParams)
-	if err == nil {
+	if err != nil {
 		panic(err.Error())
 	}
 
