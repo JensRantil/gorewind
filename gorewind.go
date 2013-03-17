@@ -64,6 +64,8 @@ func main() {
 
 	initParams := server.InitParams{
 		Store: estore,
+		CommandSocketZPath: commandSocketZPath,
+		EvPubSocketZPath: eventPublishZPath,
 	}
 	serv, err := server.New(&initParams)
 	if err != nil {

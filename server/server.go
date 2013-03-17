@@ -27,7 +27,8 @@ import (
 
 type InitParams struct {
 	Store *EventStore
-	commandSocketZPath string
+	CommandSocketZPath *string
+	EvPubSocketZPath *string
 }
 
 type Server struct {
@@ -66,7 +67,7 @@ func New(params *InitParams) (*Server, error) {
 		return nil, err
 	}
 	server.commandsock = &commandsock
-	err = commandsock.Bind((*params).commandSocketZPath)
+	err = commandsock.Bind(*params.CommandSocketZPath)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +77,7 @@ func New(params *InitParams) (*Server, error) {
 		return nil, err
 	}
 	server.evpubsock = &evpubsock
-	if binderr := evpubsock.Bind((*params).commandSocketZPath); binderr != nil {
+	if binderr := evpubsock.Bind(*params.EvPubSocketZPath); binderr != nil {
 		return nil, err
 	}
 
