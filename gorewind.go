@@ -42,6 +42,12 @@ var (
 func main() {
 	flag.Parse()
 
+	// TODO: Use logging framework
+	fmt.Println("Event store to use:", *eventStorePath)
+	fmt.Println("Command socket path:", *commandSocketZPath)
+	fmt.Println("Event publishing socket path:", *eventPublishZPath)
+	fmt.Println()
+
 	desc, err := descriptor.OpenFile(*eventStorePath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "could not create descriptor")
