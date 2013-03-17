@@ -20,6 +20,7 @@ package server
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"container/list"
 	zmq "github.com/alecthomas/gozmq"
@@ -31,6 +32,21 @@ type InitParams struct {
 	EvPubSocketZPath *string
 }
 
+// Check all required initialization parameters are set.
+func checkAllInitParamsSet(p *InitParams) error {
+	if p.Store == nil {
+		return errors.New("Missing param: Store")
+	}
+	if p.CommandSocketZPath == nil {
+		return errors.New("Missing param: CommandSocketZPath")
+	}
+	if p.EvPubSocketZPath == nil {
+		return errors.New("Missing param: EvPubSocketZPath")
+	}
+	return nil
+}
+
+// A server instance. Can be run.
 type Server struct {
 	params InitParams
 
@@ -43,6 +59,13 @@ type Server struct {
 // event store is not started. It's upp to the caller to execute Run()
 // on the server handle.
 func New(params *InitParams) (*Server, error) {
+	if params == nil {
+		return nil, errors.New("Missing init params")
+	}
+	if err := checkAllInitParamsSet(params); err != nil {
+		return nil, err
+	}
+
 	// TODO: Assert params.Store is not nil
 	server := Server{
 		params: *params,
