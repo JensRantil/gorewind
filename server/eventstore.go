@@ -103,6 +103,76 @@ func (v *EventStore) RegisterPublishedEventsChannel(publisher chan StoredEvent) 
 var streamPrefix []byte = []byte("stream")
 var eventPrefix []byte = []byte("event")
 
+type ByteCounter []byte
+
+func NewByteCounter() ByteCounter {
+	bs := make([]byte, 1)
+	bs[0] = 0
+	return bs
+}
+
+func LoadByteCounter(bs []byte) ByteCounter {
+	return bs
+}
+
+// Reverse a byte slice.
+func reverseBytes(b []byte) {
+	stop := len(b) / 2
+	rIndex := len(b) - 1
+	for lIndex, _ := range b {
+		if lIndex >= stop {
+			return
+		}
+		rIndex -= 1
+		// TODO: Benchmark if using range element below would
+		// make an improvement in speed.
+		b[rIndex], b[lIndex] = b[lIndex], b[rIndex]
+	}
+}
+
+func wrapBytes(bs []byte) {
+	for i, el := range bs {
+		if el != 255 {
+			bs[i] += 1
+			return
+		} else {
+			bs[i] = 0
+			if i == len(bs) - 1 {
+				bs = append(bs, 1)
+				return
+			}
+		}
+	}
+}
+
+func (v *ByteCounter) NewIncrementedCounter() (incr ByteCounter) {
+	incr = make([]byte, len(*v), len(*v) + 1)
+	copy(incr, *v)
+
+	reverseBytes(incr)
+	incr[0] += 1
+	if incr[0] == 0 {
+		// if we wrapped
+		wrapBytes(incr[1:])
+	}
+	reverseBytes(incr)
+	return
+}
+
+func (a *ByteCounter) Compare(b ByteCounter) int {
+	if len(*a) < len(b) {
+		return -1
+	}
+	if len(*a) > len(b) {
+		return 1
+	}
+	return bytes.Compare(*a, b)
+}
+
+func (a ByteCounter) toBytes() []byte {
+	return a
+}
+
 // Store an event to the event store. Returns the unique event id that
 // the event was stored under. As long as no error occurred, of course.
 func (v *EventStore) Add(event UnstoredEvent) (string, error) {
