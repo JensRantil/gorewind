@@ -23,18 +23,12 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"math/big"
 	"strconv"
-	//"code.google.com/p/leveldb-go/leveldb"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/descriptor"
 	"github.com/syndtr/goleveldb/leveldb/comparer"
 	iter "github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-)
-
-const (
-	EVENT_ID_CHAN_SIZE = 100
 )
 
 // Instance of an event store. All of its functions are threadsafe.
@@ -43,12 +37,7 @@ type EventStore struct {
 	// Using a map to avoid registering a channel multiple times
 	eventPublishers map[chan StoredEvent]chan StoredEvent
 
-	// A channel where we can make read event ID:s in a lock-free
-	// way.
-	eventIdChan chan string
-
-	// Write something to this channel to quit the generator
-	eventIdChanGeneratorShutdown chan bool
+	idGenerator *streamIdGenerator
 
 	db *leveldb.DB
 }
@@ -56,14 +45,9 @@ type EventStore struct {
 // Create a new event store instance.
 func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 	estore := new(EventStore)
+
 	ePublishers := make(map[chan StoredEvent]chan StoredEvent)
 	estore.eventPublishers = ePublishers
-
-	// TODO: Initialize the eventid generator with maxId+1
-	initId := "0"
-	idChan, idChanShutdown := startEventIdGenerator(&initId)
-	estore.eventIdChan = idChan
-	estore.eventIdChanGeneratorShutdown = idChanShutdown
 
 	options := &opt.Options{
 		Flag: opt.OFCreateIfMissing,
@@ -75,8 +59,19 @@ func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 	}
 	estore.db = db
 
+	estore.idGenerator = initStreamIdGenerator(db)
+
 	return estore, nil
 }
+
+func initStreamIdGenerator(db *leveldb.DB) (gen *streamIdGenerator) {
+	gen = new(streamIdGenerator)
+
+	// TODO: Initialize the streamIdGenerator from database
+
+	return
+}
+
 
 // An event that has not yet been persisted to disk.
 type UnstoredEvent struct {
@@ -173,10 +168,15 @@ func (a ByteCounter) toBytes() []byte {
 	return a
 }
 
+type EventId []byte
+
 // Store an event to the event store. Returns the unique event id that
 // the event was stored under. As long as no error occurred, of course.
-func (v *EventStore) Add(event UnstoredEvent) (string, error) {
-	newId := <-v.eventIdChan
+func (v *EventStore) Add(event UnstoredEvent) (EventId, error) {
+	newId, err := v.idGenerator.Allocate(event.Stream)
+	if err != nil {
+		return nil, err
+	}
 
 	batch := new(leveldb.Batch)
 
@@ -186,7 +186,7 @@ func (v *EventStore) Add(event UnstoredEvent) (string, error) {
 	// TODO: Rewrite to use eventStoreKey
 	streamKeyParts := [][]byte{streamPrefix, event.Stream}
 	streamKey := bytes.Join(streamKeyParts, []byte(""))
-	batch.Put(streamKey, []byte(""))
+	batch.Put(streamKey, NewByteCounter().toBytes())
 
 	evKeyParts := [][]byte{
 		eventPrefix,
@@ -198,9 +198,9 @@ func (v *EventStore) Add(event UnstoredEvent) (string, error) {
 	batch.Put(evKey, event.Data)
 
 	wo := &opt.WriteOptions{}
-	err := v.db.Write(batch, wo)
+	err = v.db.Write(batch, wo)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	storedEvent := StoredEvent{
@@ -211,13 +211,12 @@ func (v *EventStore) Add(event UnstoredEvent) (string, error) {
 	for pubchan := range v.eventPublishers {
 		pubchan <- storedEvent
 	}
-	return newId, nil
+	return EventId(newId), nil
 }
 
 // Close an open event store. A previously closed event store must never
 // be used further.
 func (v* EventStore) Close() error {
-	v.eventIdChanGeneratorShutdown <- true
 	return nil
 }
 
@@ -241,16 +240,10 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 	it := v.db.NewIterator(ro)
 
 	// To key
-	sToId := string(req.ToId)
-	toId, success := big.NewInt(0).SetString(sToId, 10)
-	if !success {
-		msg := fmt.Sprint("to key id was malformed:", sToId)
-		return errors.New(msg)
-	}
 	seekKey := eventStoreKey{
 		streamPrefix,
 		req.Stream,
-		toId,
+		LoadByteCounter(req.ToId),
 	}
 	toKeyBytes := seekKey.toBytes()
 	it.Seek(toKeyBytes)
@@ -261,16 +254,10 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 	}
 
 	// From key
-	sFromId := string(req.ToId)
-	fromId, success := big.NewInt(0).SetString(sFromId, 10)
-	if !success {
-		msg := fmt.Sprint("from key id was malformed:", sFromId)
-		return errors.New(msg)
-	}
 	seekKey = eventStoreKey{
 		streamPrefix,
 		req.Stream,
-		fromId,
+		LoadByteCounter(req.FromId),
 	}
 	fromKeyBytes := seekKey.toBytes()
 	it.Seek(fromKeyBytes)
@@ -304,44 +291,93 @@ func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 		resEvent := StoredEvent{
 			curKey.groupKey,
 			curKey.key,
-			[]byte(curKey.keyId.String()),
+			curKey.keyId.toBytes(),
 		}
 		res <- resEvent
 
 		if bytes.Compare(curKey.key, req.Stream) != 0 {
 			break
 		}
-		keyId := []byte(curKey.keyId.String())
+		keyId := curKey.keyId.toBytes()
 		if bytes.Compare(req.ToId, keyId) == 0 {
 			break
 		}
 	}
 }
 
-
-func startEventIdGenerator(initId *string) (chan string, chan bool) {
-	// TODO: Allow nextId to be set explicitly based on what's
-	// previously been stored in the event store.
-	nextId := big.NewInt(0)
-	if initId != nil {
-		nextId.SetString(*initId, 10)
-		// We do not care if this succeeded. Instead, we simply
-		// initialize with zero (0).
-	}
-	stopChan := make(chan bool)
-	idChan := make(chan string, EVENT_ID_CHAN_SIZE)
-	go func() {
-		for {
-			select {
-			case idChan <- nextId.String():
-				nextId.Add(nextId, big.NewInt(1))
-			case <-stopChan:
-				return
-			}
-		}
-	}()
-	return idChan, stopChan
+type atomicByteCounter struct {
+	nextUnused ByteCounter
+	lock sync.Mutex
 }
+
+func newAtomicByteCounter(next ByteCounter) (c *atomicByteCounter) {
+	c = new(atomicByteCounter)
+	c.nextUnused = next
+	return
+}
+
+func (c *atomicByteCounter) next() (res ByteCounter) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	res = c.nextUnused
+	c.nextUnused = c.nextUnused.NewIncrementedCounter()
+
+	return
+}
+
+// A stream name.
+type StreamName []byte
+
+// Keeps track of ordered set of ByteCounters, one per registered stream.
+type streamIdGenerator struct {
+	// key type must be string because []byte is not a valid key
+	// data type.
+	counters map[string]atomicByteCounter
+
+	// lock for counters
+	lock sync.RWMutex
+}
+
+func newStreamIdGenerator() (s *streamIdGenerator) {
+	s = new(streamIdGenerator)
+	s.counters = make(map[string]atomicByteCounter)
+	return
+}
+
+// Check whether a named counter previously has been registered.
+func (g *streamIdGenerator) isRegistered(name StreamName) (exists bool) {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+	_, exists = g.counters[string(name)]
+	return
+}
+
+// Register a new ByteCounter.
+func (g *streamIdGenerator) Register(name StreamName, init ByteCounter) error {
+	if g.isRegistered(name) {
+		return errors.New("name already registered")
+	}
+
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.counters[string(name)] = *newAtomicByteCounter(init)
+	return nil
+}
+
+// Allocate a new unused counter for a specific stream.
+func (g *streamIdGenerator) Allocate(name StreamName) (ByteCounter, error) {
+	if !g.isRegistered(name) {
+		// Auto registering
+		g.Register(name, []byte{0})
+	}
+
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	counter := g.counters[string(name)]
+	return counter.next(), nil
+}
+
 
 // The separator used for separating into the different eventStoreKey
 // fields.
@@ -351,7 +387,7 @@ var groupSep []byte = []byte(":")
 type eventStoreKey struct {
 	groupKey []byte
 	key []byte
-	keyId *big.Int
+	keyId ByteCounter
 }
 
 // Convert a eventStoreKey to bytes. The returned byte slice is either
@@ -363,7 +399,7 @@ func (v *eventStoreKey) toBytes() []byte {
 		pieces = make([][]byte, 3)
 		pieces[0] = v.groupKey
 		pieces[1] = v.key
-		pieces[2] = []byte(v.keyId.String())
+		pieces[2] = v.keyId
 	} else {
 		pieces = make([][]byte, 2)
 		pieces[0] = v.groupKey
@@ -378,11 +414,7 @@ func neweventStoreKey(data []byte) (*eventStoreKey) {
 	res := new(eventStoreKey)
 	pieces := bytes.Split(data, groupSep)
 	if len(pieces) > 2 {
-		possibleId := big.NewInt(0)
-		_, success := possibleId.SetString(string(pieces[len(pieces)-1]), 10)
-		if success {
-			res.keyId = possibleId
-		}
+		res.keyId = pieces[len(pieces)-1]
 	}
 	if len(pieces) > 0 {
 		res.groupKey = pieces[0]
@@ -412,7 +444,7 @@ func (o1 *eventStoreKey) compare(o2 *eventStoreKey) int {
 	}
 	switch {
 	case o1.keyId != nil && o2.keyId != nil:
-		return o1.keyId.Cmp(o2.keyId)
+		return o1.keyId.Compare(o2.keyId)
 	case o1.keyId != nil:
 		return 1
 	case o2.keyId != nil:
