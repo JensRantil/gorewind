@@ -76,7 +76,7 @@ func initStreamIdGenerator(db *leveldb.DB) (gen *streamIdGenerator) {
 // An event that has not yet been persisted to disk.
 type UnstoredEvent struct {
 	// The name of the stream to which this event shall be stored.
-	Stream []byte
+	Stream StreamName
 	// The data that is to be stored for this event. Can be an
 	// arbitrary byte slice.
 	Data []byte
@@ -85,7 +85,7 @@ type UnstoredEvent struct {
 // An event that has previously been persisted to disk.
 type StoredEvent struct {
 	// The name of the stream in which this event is stored.
-	Stream []byte
+	Stream StreamName
 	// The ID for the stored event. No other event exists with name
 	// Stream and ID Id.
 	Id []byte
