@@ -88,7 +88,7 @@ type StoredEvent struct {
 	Stream StreamName
 	// The ID for the stored event. No other event exists with name
 	// Stream and ID Id.
-	Id []byte
+	Id EventId
 	// The data stored for the event. Can be an arbitrary byte
 	// slice.
 	Data []byte
