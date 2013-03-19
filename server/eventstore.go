@@ -64,6 +64,7 @@ func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 	return estore, nil
 }
 
+// Helper function to initialize a streamIdGenerator.
 func initStreamIdGenerator(db *leveldb.DB) (gen *streamIdGenerator) {
 	gen = new(streamIdGenerator)
 
@@ -72,17 +73,24 @@ func initStreamIdGenerator(db *leveldb.DB) (gen *streamIdGenerator) {
 	return
 }
 
-
 // An event that has not yet been persisted to disk.
 type UnstoredEvent struct {
+	// The name of the stream to which this event shall be stored.
 	Stream []byte
+	// The data that is to be stored for this event. Can be an
+	// arbitrary byte slice.
 	Data []byte
 }
 
 // An event that has previously been persisted to disk.
 type StoredEvent struct {
+	// The name of the stream in which this event is stored.
 	Stream []byte
+	// The ID for the stored event. No other event exists with name
+	// Stream and ID Id.
 	Id []byte
+	// The data stored for the event. Can be an arbitrary byte
+	// slice.
 	Data []byte
 }
 
@@ -98,14 +106,18 @@ func (v *EventStore) RegisterPublishedEventsChannel(publisher chan StoredEvent) 
 var streamPrefix []byte = []byte("stream")
 var eventPrefix []byte = []byte("event")
 
+// An incrementable byte slice. It's orderable and is used to have
+// strict ordering between events within a single event stream.
 type ByteCounter []byte
 
+// Create a brand new ByteCounter and initialize it to 0.
 func NewByteCounter() ByteCounter {
 	bs := make([]byte, 1)
 	bs[0] = 0
 	return bs
 }
 
+// Load a ByteCounter from a byte slice.
 func LoadByteCounter(bs []byte) ByteCounter {
 	return bs
 }
@@ -125,6 +137,7 @@ func reverseBytes(b []byte) {
 	}
 }
 
+// Helper function used when incrementing a ByteCounter.
 func wrapBytes(bs []byte) {
 	for i, el := range bs {
 		if el != 255 {
@@ -140,6 +153,7 @@ func wrapBytes(bs []byte) {
 	}
 }
 
+// Create a brand new incremented ByteCounter based on a previous one.
 func (v *ByteCounter) NewIncrementedCounter() (incr ByteCounter) {
 	incr = make([]byte, len(*v), len(*v) + 1)
 	copy(incr, *v)
@@ -154,6 +168,8 @@ func (v *ByteCounter) NewIncrementedCounter() (incr ByteCounter) {
 	return
 }
 
+// Compare ByteCounter a with ByteCounter b. Returns -1 if a is smaller
+// than b, 0 if they are equal, 1 if b is smaller than a.
 func (a *ByteCounter) Compare(b ByteCounter) int {
 	if len(*a) < len(b) {
 		return -1
@@ -164,6 +180,7 @@ func (a *ByteCounter) Compare(b ByteCounter) int {
 	return bytes.Compare(*a, b)
 }
 
+// Convert a ByteCounter to a byte slice. Ie., serialize it.
 func (a ByteCounter) toBytes() []byte {
 	return a
 }
