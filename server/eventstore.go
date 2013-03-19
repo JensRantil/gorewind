@@ -108,17 +108,17 @@ var eventPrefix []byte = []byte("event")
 
 // An incrementable byte slice. It's orderable and is used to have
 // strict ordering between events within a single event stream.
-type ByteCounter []byte
+type byteCounter []byte
 
-// Create a brand new ByteCounter and initialize it to 0.
-func NewByteCounter() ByteCounter {
+// Create a brand new byteCounter and initialize it to 0.
+func newByteCounter() byteCounter {
 	bs := make([]byte, 1)
 	bs[0] = 0
 	return bs
 }
 
-// Load a ByteCounter from a byte slice.
-func LoadByteCounter(bs []byte) ByteCounter {
+// Load a byteCounter from a byte slice.
+func loadbyteCounter(bs []byte) byteCounter {
 	return bs
 }
 
@@ -137,7 +137,7 @@ func reverseBytes(b []byte) {
 	}
 }
 
-// Helper function used when incrementing a ByteCounter.
+// Helper function used when incrementing a byteCounter.
 func wrapBytes(bs []byte) {
 	for i, el := range bs {
 		if el != 255 {
@@ -153,8 +153,8 @@ func wrapBytes(bs []byte) {
 	}
 }
 
-// Create a brand new incremented ByteCounter based on a previous one.
-func (v *ByteCounter) NewIncrementedCounter() (incr ByteCounter) {
+// Create a brand new incremented byteCounter based on a previous one.
+func (v *byteCounter) NewIncrementedCounter() (incr byteCounter) {
 	incr = make([]byte, len(*v), len(*v) + 1)
 	copy(incr, *v)
 
@@ -168,9 +168,9 @@ func (v *ByteCounter) NewIncrementedCounter() (incr ByteCounter) {
 	return
 }
 
-// Compare ByteCounter a with ByteCounter b. Returns -1 if a is smaller
+// Compare byteCounter a with byteCounter b. Returns -1 if a is smaller
 // than b, 0 if they are equal, 1 if b is smaller than a.
-func (a *ByteCounter) Compare(b ByteCounter) int {
+func (a *byteCounter) Compare(b byteCounter) int {
 	if len(*a) < len(b) {
 		return -1
 	}
@@ -180,8 +180,8 @@ func (a *ByteCounter) Compare(b ByteCounter) int {
 	return bytes.Compare(*a, b)
 }
 
-// Convert a ByteCounter to a byte slice. Ie., serialize it.
-func (a ByteCounter) toBytes() []byte {
+// Convert a byteCounter to a byte slice. Ie., serialize it.
+func (a byteCounter) toBytes() []byte {
 	return a
 }
 
@@ -203,7 +203,7 @@ func (v *EventStore) Add(event UnstoredEvent) (EventId, error) {
 	// TODO: Rewrite to use eventStoreKey
 	streamKeyParts := [][]byte{streamPrefix, event.Stream}
 	streamKey := bytes.Join(streamKeyParts, []byte(""))
-	batch.Put(streamKey, NewByteCounter().toBytes())
+	batch.Put(streamKey, newByteCounter().toBytes())
 
 	evKeyParts := [][]byte{
 		eventPrefix,
@@ -260,7 +260,7 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 	seekKey := eventStoreKey{
 		streamPrefix,
 		req.Stream,
-		LoadByteCounter(req.ToId),
+		loadbyteCounter(req.ToId),
 	}
 	toKeyBytes := seekKey.toBytes()
 	it.Seek(toKeyBytes)
@@ -274,7 +274,7 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 	seekKey = eventStoreKey{
 		streamPrefix,
 		req.Stream,
-		LoadByteCounter(req.FromId),
+		loadbyteCounter(req.FromId),
 	}
 	fromKeyBytes := seekKey.toBytes()
 	it.Seek(fromKeyBytes)
@@ -322,18 +322,18 @@ func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 	}
 }
 
-type atomicByteCounter struct {
-	nextUnused ByteCounter
+type atomicbyteCounter struct {
+	nextUnused byteCounter
 	lock sync.Mutex
 }
 
-func newAtomicByteCounter(next ByteCounter) (c *atomicByteCounter) {
-	c = new(atomicByteCounter)
+func newAtomicbyteCounter(next byteCounter) (c *atomicbyteCounter) {
+	c = new(atomicbyteCounter)
 	c.nextUnused = next
 	return
 }
 
-func (c *atomicByteCounter) next() (res ByteCounter) {
+func (c *atomicbyteCounter) next() (res byteCounter) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -346,11 +346,11 @@ func (c *atomicByteCounter) next() (res ByteCounter) {
 // A stream name.
 type StreamName []byte
 
-// Keeps track of ordered set of ByteCounters, one per registered stream.
+// Keeps track of ordered set of byteCounters, one per registered stream.
 type streamIdGenerator struct {
 	// key type must be string because []byte is not a valid key
 	// data type.
-	counters map[string]atomicByteCounter
+	counters map[string]atomicbyteCounter
 
 	// lock for counters
 	lock sync.RWMutex
@@ -358,7 +358,7 @@ type streamIdGenerator struct {
 
 func newStreamIdGenerator() (s *streamIdGenerator) {
 	s = new(streamIdGenerator)
-	s.counters = make(map[string]atomicByteCounter)
+	s.counters = make(map[string]atomicbyteCounter)
 	return
 }
 
@@ -370,20 +370,20 @@ func (g *streamIdGenerator) isRegistered(name StreamName) (exists bool) {
 	return
 }
 
-// Register a new ByteCounter.
-func (g *streamIdGenerator) Register(name StreamName, init ByteCounter) error {
+// Register a new byteCounter.
+func (g *streamIdGenerator) Register(name StreamName, init byteCounter) error {
 	if g.isRegistered(name) {
 		return errors.New("name already registered")
 	}
 
 	g.lock.Lock()
 	defer g.lock.Unlock()
-	g.counters[string(name)] = *newAtomicByteCounter(init)
+	g.counters[string(name)] = *newAtomicbyteCounter(init)
 	return nil
 }
 
 // Allocate a new unused counter for a specific stream.
-func (g *streamIdGenerator) Allocate(name StreamName) (ByteCounter, error) {
+func (g *streamIdGenerator) Allocate(name StreamName) (byteCounter, error) {
 	if !g.isRegistered(name) {
 		// Auto registering
 		g.Register(name, []byte{0})
@@ -404,7 +404,7 @@ var groupSep []byte = []byte(":")
 type eventStoreKey struct {
 	groupKey []byte
 	key []byte
-	keyId ByteCounter
+	keyId byteCounter
 }
 
 // Convert a eventStoreKey to bytes. The returned byte slice is either
