@@ -51,7 +51,7 @@ func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 
 	options := &opt.Options{
 		Flag: opt.OFCreateIfMissing,
-		Comparer: &EventStreamComparer{},
+		Comparer: &eventStreamComparer{},
 	}
 	db, err := leveldb.Open(desc, options)
 	if err != nil {
@@ -267,7 +267,7 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 		return errors.New(msg)
 	}
 
-	diff := new(EventStreamComparer).Compare(fromKeyBytes, toKeyBytes)
+	diff := new(eventStreamComparer).Compare(fromKeyBytes, toKeyBytes)
 	if diff >= -1 {
 		msg := "The query was done in wrong chronological order."
 		return errors.New(msg)
@@ -479,17 +479,17 @@ func getIntegerPart(key []byte) (int, error) {
 
 // Comparer
 
-type EventStreamComparer struct {
+type eventStreamComparer struct {
 }
 
-func (v* EventStreamComparer) Name() string {
+func (v* eventStreamComparer) Name() string {
 	return "rewindd.eventStreamComparer"
 }
 
 // If 'a' < 'b', changes 'a' to a short string in [a,b).
 //
 // Used to minimize the size of index blocks and other data structures.
-func (v* EventStreamComparer) Separator(a, b []byte) []byte {
+func (v* eventStreamComparer) Separator(a, b []byte) []byte {
 	groupA := getGroup(a)
 	groupB := getGroup(b)
 	if c := bytes.Compare(groupA, groupB); c != 0 {
@@ -553,7 +553,7 @@ func (v* EventStreamComparer) Separator(a, b []byte) []byte {
 // Changes 'b' to a short string >= 'b'
 //
 // Used to minimize the size of index blocks and other data structures.
-func (v* EventStreamComparer) Successor(b []byte) []byte {
+func (v* eventStreamComparer) Successor(b []byte) []byte {
 	groupB := getGroup(b)
 	bcomp := comparer.BytesComparer{}
 	return bytes.Join([][]byte{
@@ -562,7 +562,7 @@ func (v* EventStreamComparer) Successor(b []byte) []byte {
 	}, groupSep)
 }
 
-func (v* EventStreamComparer) Compare(a, b []byte) int {
+func (v* eventStreamComparer) Compare(a, b []byte) int {
 	groupA := getGroup(a)
 	groupB := getGroup(b)
 	if c := bytes.Compare(groupA, groupB); c != 0 {
