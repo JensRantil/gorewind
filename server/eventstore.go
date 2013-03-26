@@ -203,7 +203,7 @@ func (v *EventStore) Add(event UnstoredEvent) (EventId, error) {
 	// TODO: Rewrite to use eventStoreKey
 	streamKeyParts := [][]byte{streamPrefix, event.Stream}
 	streamKey := bytes.Join(streamKeyParts, []byte(""))
-	batch.Put(streamKey, newByteCounter().toBytes())
+	batch.Put(streamKey, newId.toBytes())
 
 	evKeyParts := [][]byte{
 		eventPrefix,
