@@ -97,7 +97,6 @@ type StoredEvent struct {
 // Register a channel where are published events will be pushed to.
 // Multiple channels can be registered.
 func (v *EventStore) RegisterPublishedEventsChannel(publisher chan StoredEvent) {
-	// TODO: Implement an UnregisterPublishedEventsChannel.
 	v.eventPublishersLock.Lock()
 	defer v.eventPublishersLock.Unlock()
 	v.eventPublishers[publisher] = publisher
