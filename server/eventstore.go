@@ -302,7 +302,7 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 	defer close(res)
 	for i.Next() {
-		curKey := neweventStoreKey(i.Key())
+		curKey := newEventStoreKey(i.Key())
 		if bytes.Compare(curKey.groupKey, streamPrefix) != 0 {
 			break
 		}
@@ -429,7 +429,7 @@ func (v *eventStoreKey) toBytes() []byte {
 }
 
 // Convert a byte slice to a parsed eventStoreKey.
-func neweventStoreKey(data []byte) (*eventStoreKey) {
+func newEventStoreKey(data []byte) (*eventStoreKey) {
 	res := new(eventStoreKey)
 	pieces := bytes.Split(data, groupSep)
 	if len(pieces) > 2 {
@@ -485,8 +485,8 @@ func (v* eventStreamComparer) Name() string {
 //
 // Used to minimize the size of index blocks and other data structures.
 func (v* eventStreamComparer) Separator(a, b []byte) []byte {
-	keyA := neweventStoreKey(a)
-	keyB := neweventStoreKey(b)
+	keyA := newEventStoreKey(a)
+	keyB := newEventStoreKey(b)
 
 	if c := bytes.Compare(keyA.groupKey, keyB.groupKey); c != 0 {
 		bcomp := comparer.BytesComparer{}
@@ -519,7 +519,7 @@ func (v* eventStreamComparer) Separator(a, b []byte) []byte {
 //
 // Used to minimize the size of index blocks and other data structures.
 func (v* eventStreamComparer) Successor(b []byte) []byte {
-	keyB := neweventStoreKey(b)
+	keyB := newEventStoreKey(b)
 	bcomp := comparer.BytesComparer{}
 	successor := eventStoreKey{
 		bcomp.Successor(keyB.groupKey),
@@ -530,7 +530,7 @@ func (v* eventStreamComparer) Successor(b []byte) []byte {
 }
 
 func (v* eventStreamComparer) Compare(a, b []byte) int {
-	keyA := neweventStoreKey(a)
-	keyB := neweventStoreKey(b)
+	keyA := newEventStoreKey(a)
+	keyB := newEventStoreKey(b)
 	return keyA.Compare(keyB)
 }
