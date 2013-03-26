@@ -195,7 +195,7 @@ func publishAllSavedEvents(toPublish chan StoredEvent, evpub zmq.Socket) {
 	}
 }
 
-// Handles a single ZeroMQ RES/REQ loop.
+// Handles a single ZeroMQ RES/REQ loop synchronously.
 //
 // The full request message stored in `msg` and the full ZeroMQ response
 // is pushed to `respchan`. The function does not return any error
