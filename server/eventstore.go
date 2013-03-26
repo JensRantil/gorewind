@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"strconv"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/descriptor"
 	"github.com/syndtr/goleveldb/leveldb/comparer"
@@ -455,7 +454,7 @@ func neweventStoreKey(data []byte) (*eventStoreKey) {
 
 // Compare to another eventStoreKey. Returns -1 if this one is smaller
 // than o2, 0 same, or 1 is this one is bigger than the previous one.
-func (o1 *eventStoreKey) compare(o2 *eventStoreKey) int {
+func (o1 *eventStoreKey) Compare(o2 *eventStoreKey) int {
 	if diff := bytes.Compare(o1.groupKey, o2.groupKey); diff != 0 {
 		return diff
 	}
@@ -473,30 +472,6 @@ func (o1 *eventStoreKey) compare(o2 *eventStoreKey) int {
 	return 0
 }
 
-// Helper functions for comparer
-
-func getGroup(key []byte) []byte {
-	return bytes.SplitN(key, groupSep, 1)[0]
-}
-
-func getRealKey(key []byte) []byte {
-	pieces := bytes.Split(key, groupSep)
-	if _, err := getIntegerPart(key); err != nil {
-		return bytes.Join(pieces[1:len(pieces)], groupSep)
-	}
-	return bytes.Join(pieces[1:len(pieces) - 1], groupSep)
-}
-
-func getIntegerPart(key []byte) (int, error) {
-	pieces := bytes.Split(key, groupSep)
-	lastpiece := pieces[len(pieces) - 1]
-	i, err := strconv.Atoi(string(lastpiece))
-	if err != nil {
-		return 0, err
-	}
-	return i, nil
-}
-
 // Comparer
 
 type eventStreamComparer struct {
@@ -510,63 +485,33 @@ func (v* eventStreamComparer) Name() string {
 //
 // Used to minimize the size of index blocks and other data structures.
 func (v* eventStreamComparer) Separator(a, b []byte) []byte {
-	groupA := getGroup(a)
-	groupB := getGroup(b)
-	if c := bytes.Compare(groupA, groupB); c != 0 {
-		bcomp := comparer.BytesComparer{}
-		return bytes.Join([][]byte{
-			bcomp.Separator(groupA, groupB),
-			[]byte{},
-		}, groupSep)
-	}
-	// Here we know that groupA==groupB
+	keyA := neweventStoreKey(a)
+	keyB := neweventStoreKey(b)
 
-	realKeyA := getRealKey(a)
-	realKeyB := getRealKey(b)
-	if c := bytes.Compare(realKeyA, realKeyB); c != 0 {
+	if c := bytes.Compare(keyA.groupKey, keyB.groupKey); c != 0 {
 		bcomp := comparer.BytesComparer{}
-		return bytes.Join([][]byte{
-			groupA,
-			bcomp.Separator(realKeyA, realKeyA),
-		}, groupSep)
-	}
-	// Here we know that realKeyA==realKeyB
-
-	// TODO: Handle this
-	intPartA, errA := getIntegerPart(a)
-	intPartB, errB := getIntegerPart(b)
-	switch {
-	case errA == nil && errB == nil:
-		// [Group, key, intA] </>/= [Group, key, intB]
-		switch {
-		case intPartA < intPartB:
-			return bytes.Join([][]byte{
-				groupA,
-				realKeyA,
-				[]byte(strconv.Itoa(intPartB - 1)),
-			}, groupSep)
-		/*case intPartA > intPartB:
-			return a*/
-		default:
-			return a
+		smallerKey := eventStoreKey{
+			bcomp.Separator(keyA.groupKey, keyB.groupKey),
+			nil,
+			nil,
 		}
-	case errA != nil && errB != nil:
-		// [Group, key] == [Group, key]
-		return a
-	case errA != nil:
-		// [Group, key, int] > [Group, key]
-		return a
+		return smallerKey.toBytes()
 	}
-	//default: -- must be put outside of switch to avoid compiler
-	//error.
-	// [Group, key] < [Group, key, int]
-	return bytes.Join([][]byte{
-		groupA,
-		realKeyA,
-		[]byte("1"),
-	}, groupSep)
+	// Here we know that keyA.groupKey==keyB.groupKey
+
+	if c := bytes.Compare(keyA.key, keyB.key); c != 0 {
+		bcomp := comparer.BytesComparer{}
+		smallerKey := eventStoreKey{
+			keyA.groupKey,
+			bcomp.Separator(keyA.key, keyB.key),
+			nil,
+		}
+		return smallerKey.toBytes()
+	}
+	// Here we know that keyA.key==keyB.key
 
 	// Unoptimized result that always works.
+	// Can't make it shorter than it already is :-/
 	return a
 }
 
@@ -574,49 +519,18 @@ func (v* eventStreamComparer) Separator(a, b []byte) []byte {
 //
 // Used to minimize the size of index blocks and other data structures.
 func (v* eventStreamComparer) Successor(b []byte) []byte {
-	groupB := getGroup(b)
+	keyB := neweventStoreKey(b)
 	bcomp := comparer.BytesComparer{}
-	return bytes.Join([][]byte{
-		bcomp.Successor(groupB),
-		[]byte{},
-	}, groupSep)
+	successor := eventStoreKey{
+		bcomp.Successor(keyB.groupKey),
+		nil,
+		nil,
+	}
+	return successor.toBytes()
 }
 
 func (v* eventStreamComparer) Compare(a, b []byte) int {
-	groupA := getGroup(a)
-	groupB := getGroup(b)
-	if c := bytes.Compare(groupA, groupB); c != 0 {
-		return c
-	}
-
-	realKeyA := getRealKey(a)
-	realKeyB := getRealKey(b)
-	if c := bytes.Compare(realKeyA, realKeyB); c != 0 {
-		return c
-	}
-
-	intPartA, errA := getIntegerPart(a)
-	intPartB, errB := getIntegerPart(b)
-	switch {
-	case errA == nil && errB == nil:
-		// [Group, key, intA] </>/= [Group, key, intB]
-		switch {
-		case intPartA < intPartB:
-			return -1
-		case intPartA > intPartB:
-			return 1
-		default:
-			return 0
-		}
-	case errA != nil && errB != nil:
-		// [Group, key] == [Group, key]
-		return 0
-	case errA != nil:
-		// [Group, key, int] > [Group, key]
-		return 1
-	}
-	//default: -- must be put outside of switch to avoid compiler
-	//error.
-	// [Group, key] < [Group, key, int]
-	return -1
+	keyA := neweventStoreKey(a)
+	keyB := neweventStoreKey(b)
+	return keyA.Compare(keyB)
 }
