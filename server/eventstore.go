@@ -200,19 +200,19 @@ func (v *EventStore) Add(event UnstoredEvent) (EventId, error) {
 	// TODO: Benchmark how much impact this write has. We could also
 	// check if it exists and not write it in that case, which is
 	// probably faster. Especially if we are using bloom filter.
-	// TODO: Rewrite to use eventStoreKey
-	streamKeyParts := [][]byte{streamPrefix, event.Stream}
-	streamKey := bytes.Join(streamKeyParts, []byte(""))
-	batch.Put(streamKey, newId.toBytes())
+	streamKey := eventStoreKey{
+		streamPrefix,
+		event.Stream,
+		nil,
+	}
+	batch.Put(streamKey.toBytes(), newId.toBytes())
 
-	evKeyParts := [][]byte{
+	evKey := eventStoreKey{
 		eventPrefix,
 		event.Stream,
-		[]byte(":"),
-		[]byte(newId),
+		newId.toBytes(),
 	}
-	evKey := bytes.Join(evKeyParts, []byte(""))
-	batch.Put(evKey, event.Data)
+	batch.Put(evKey.toBytes(), event.Data)
 
 	wo := &opt.WriteOptions{}
 	err = v.db.Write(batch, wo)
