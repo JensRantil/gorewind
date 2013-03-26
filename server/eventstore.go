@@ -58,18 +58,47 @@ func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 	}
 	estore.db = db
 
-	estore.idGenerator = initStreamIdGenerator(db)
+	estore.idGenerator, err = initStreamIdGenerator(db)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
 
 	return estore, nil
 }
 
 // Helper function to initialize a streamIdGenerator.
-func initStreamIdGenerator(db *leveldb.DB) (gen *streamIdGenerator) {
-	gen = new(streamIdGenerator)
+func initStreamIdGenerator(db *leveldb.DB) (*streamIdGenerator, error) {
+	gen := new(streamIdGenerator)
 
-	// TODO: Initialize the streamIdGenerator from database
+	searchKey := eventStoreKey{
+		streamPrefix,
+		nil,
+		nil,
+	}
 
-	return
+	ro := &opt.ReadOptions{}
+	it := db.NewIterator(ro)
+	it.Seek(searchKey.toBytes())
+	for it.Valid() {
+		key := newEventStoreKey(it.Key())
+		if bytes.Compare(key.groupKey, streamPrefix) != 0 {
+			// We have reached the end of the stream listing
+			break
+		}
+
+		stream := key.key
+		latestId := loadbyteCounter(it.Value())
+		nextId := latestId.NewIncrementedCounter()
+		err := gen.Register(stream, nextId)
+		if err != nil {
+			return nil, err
+		}
+
+		it.Next()
+	}
+
+	return gen, nil
 }
 
 // An event that has not yet been persisted to disk.
