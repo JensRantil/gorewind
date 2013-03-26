@@ -393,8 +393,8 @@ func (g *streamIdGenerator) Allocate(name StreamName) (byteCounter, error) {
 		g.Register(name, []byte{0})
 	}
 
-	g.lock.Lock()
-	defer g.lock.Unlock()
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 	counter := g.counters[string(name)]
 	return counter.Next(), nil
 }
