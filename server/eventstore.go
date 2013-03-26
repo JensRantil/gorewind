@@ -225,9 +225,13 @@ func (v *EventStore) Add(event UnstoredEvent) (EventId, error) {
 		Id: []byte(newId),
 		Data: event.Data,
 	}
+
+	v.eventPublishersLock.RLock()
+	defer v.eventPublishersLock.RUnlock()
 	for pubchan := range v.eventPublishers {
 		pubchan <- storedEvent
 	}
+
 	return EventId(newId), nil
 }
 
