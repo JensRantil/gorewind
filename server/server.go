@@ -66,7 +66,6 @@ func New(params *InitParams) (*Server, error) {
 		return nil, err
 	}
 
-	// TODO: Assert params.Store is not nil
 	server := Server{
 		params: *params,
 	}
@@ -294,8 +293,7 @@ func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 				response.PushBack(eventdata.Stream)
 				response.PushBack(eventdata.Id)
 				response.PushBack(eventdata.Data)
-				// TODO: Prepend the router
-				// frames before!
+
 				respchan <- listToFrames(response)
 			}
 			response := copyList(resptemplate)
