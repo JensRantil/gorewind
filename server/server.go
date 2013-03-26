@@ -142,11 +142,11 @@ func asyncPoll(notifier chan zmqPollResult, items zmq.PollItems) {
 // asynchronously using the router socket. Every request is delegated to
 // a goroutine for maximum concurrency.
 //
-// `gozmq` does currently not support copy-free messages/fram This means that
-// every message passing through this function needs to be copied
-// in-memory. If this becomes a bottleneck in the future, multiple
-// router sockets can be hooked to this final router to scale message
-// copying to multiple cor
+// `gozmq` does currently not support copy-free messages/frames. This
+// means that every message passing through this function needs to be
+// copied in-memory. If this becomes a bottleneck in the future,
+// multiple router sockets can be hooked to this final router to scale
+// message copying.
 func loopServer(estore *EventStore, evpubsock, frontend zmq.Socket) {
 	toPoll := zmq.PollItems{
 		zmq.PollItem{Socket: frontend, zmq.Events: zmq.POLLIN},
