@@ -333,7 +333,7 @@ func newAtomicbyteCounter(next byteCounter) (c *atomicbyteCounter) {
 	return
 }
 
-func (c *atomicbyteCounter) next() (res byteCounter) {
+func (c *atomicbyteCounter) Next() (res byteCounter) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -392,7 +392,7 @@ func (g *streamIdGenerator) Allocate(name StreamName) (byteCounter, error) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	counter := g.counters[string(name)]
-	return counter.next(), nil
+	return counter.Next(), nil
 }
 
 
