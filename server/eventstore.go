@@ -88,7 +88,7 @@ func initStreamIdGenerator(db *leveldb.DB) (*streamIdGenerator, error) {
 		}
 
 		stream := key.key
-		latestId := loadbyteCounter(it.Value())
+		latestId := loadByteCounter(it.Value())
 		nextId := latestId.NewIncrementedCounter()
 		err := gen.Register(stream, nextId)
 		if err != nil {
@@ -145,7 +145,7 @@ func newByteCounter() byteCounter {
 }
 
 // Load a byteCounter from a byte slice.
-func loadbyteCounter(bs []byte) byteCounter {
+func loadByteCounter(bs []byte) byteCounter {
 	return bs
 }
 
@@ -291,7 +291,7 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 	seekKey := eventStoreKey{
 		streamPrefix,
 		req.Stream,
-		loadbyteCounter(req.ToId),
+		loadByteCounter(req.ToId),
 	}
 	toKeyBytes := seekKey.toBytes()
 	it.Seek(toKeyBytes)
@@ -305,7 +305,7 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 	seekKey = eventStoreKey{
 		streamPrefix,
 		req.Stream,
-		loadbyteCounter(req.FromId),
+		loadByteCounter(req.FromId),
 	}
 	fromKeyBytes := seekKey.toBytes()
 	it.Seek(fromKeyBytes)
