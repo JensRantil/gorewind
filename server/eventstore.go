@@ -469,7 +469,7 @@ func newEventStoreKey(data []byte) (*eventStoreKey) {
 	}
 	if len(pieces) > 1 {
 		var upperIndex int
-		// TODO: Handle the case when len(pieces)>=max(int)
+		// FIXME: Handle the case when len(pieces)>=max(int)
 		if res.keyId != nil {
 			upperIndex = len(pieces) - 1
 		} else {

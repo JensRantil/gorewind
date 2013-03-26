@@ -72,7 +72,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	// TODO: Handle SIGINT correctly and smoothly.
+	// FIXME: Handle SIGINT correctly and smoothly.
 
 	serv.Run()
 }
