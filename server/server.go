@@ -56,7 +56,7 @@ type Server struct {
 }
 
 // Initialize a new event store server and return a handle to it. The
-// event store is not started. It's upp to the caller to execute Run()
+// event store is not started. It's up to the caller to execute Run()
 // on the server handle.
 func New(params *InitParams) (*Server, error) {
 	if params == nil {
