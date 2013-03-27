@@ -157,14 +157,15 @@ func loopServer(estore *EventStore, evpubsock, frontend zmq.Socket) {
 	go publishAllSavedEvents(pubchan, evpubsock)
 
 	pollchan := make(chan zmqPollResult)
-	respchan := make(chan [][]byte)
+	respchan := make(chan zMsg)
 	go asyncPoll(pollchan, toPoll)
 	for {
 		select {
 		case <- pollchan:
 			if toPoll[0].REvents&zmq.POLLIN != 0 {
 				msg, _ := toPoll[0].Socket.RecvMultipart(0)
-				go handleRequest(respchan, estore, msg)
+				zmsg := zMsg(msg)
+				go handleRequest(respchan, estore, zmsg)
 			}
 			go asyncPoll(pollchan, toPoll)
 		case frames := <-respchan:
@@ -180,7 +181,7 @@ func loopServer(estore *EventStore, evpubsock, frontend zmq.Socket) {
 // Pops previously stored messages off a channel and published them to a
 // ZeroMQ socket.
 func publishAllSavedEvents(toPublish chan StoredEvent, evpub zmq.Socket) {
-	msg := make([][]byte, 3)
+	msg := make(zMsg, 3)
 	for {
 		event := <-toPublish
 
@@ -195,12 +196,23 @@ func publishAllSavedEvents(toPublish chan StoredEvent, evpub zmq.Socket) {
 	}
 }
 
+// A single frame in a ZeroMQ message.
+type zFrame []byte
+
+// A ZeroMQ message.
+//
+// I wish it could have been `[]zFrame`, but that would make conversion
+// from `[][]byte` pretty messy[1].
+//
+// [1] http://stackoverflow.com/a/15650327/260805
+type zMsg [][]byte
+
 // Handles a single ZeroMQ RES/REQ loop synchronously.
 //
 // The full request message stored in `msg` and the full ZeroMQ response
 // is pushed to `respchan`. The function does not return any error
 // because it is expected to be called asynchronously as a goroutine.
-func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
+func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 
 	// TODO: Rename to 'framelist'
 	parts := list.New()
@@ -212,11 +224,11 @@ func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 	// calling this method. That would yield a nicer API without
 	// nitty gritty ZeroMQ details.
 	resptemplate := list.New()
-	emptyFrame := []byte("")
+	emptyFrame := zFrame("")
 	for true {
 		resptemplate.PushBack(parts.Remove(parts.Front()))
 
-		if bytes.Equal(parts.Front().Value.([]byte), emptyFrame) {
+		if bytes.Equal(parts.Front().Value.(zFrame), emptyFrame) {
 			break
 		}
 	}
@@ -226,12 +238,12 @@ func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 		// TODO: Migrate to logging system
 		fmt.Println(errstr)
 		response := copyList(resptemplate)
-		response.PushBack([]byte("ERROR " + errstr))
+		response.PushBack(zFrame("ERROR " + errstr))
 		respchan <- listToFrames(response)
 		return
 	}
 
-	command := string(parts.Front().Value.([]byte))
+	command := string(parts.Front().Value.(zFrame))
 	switch command {
 	case "PUBLISH":
 		parts.Remove(parts.Front())
@@ -240,14 +252,14 @@ func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 			// TODO: Migrate to logging system
 			fmt.Println(errstr)
 			response := copyList(resptemplate)
-			response.PushBack([]byte("ERROR " + errstr))
+			response.PushBack(zFrame("ERROR " + errstr))
 			respchan <- listToFrames(response)
 		} else {
 			estream := parts.Remove(parts.Front())
 			data := parts.Remove(parts.Front())
 			newevent := UnstoredEvent{
-				Stream: estream.([]byte),
-				Data: data.([]byte),
+				Stream: estream.(StreamName),
+				Data: data.(zFrame),
 			}
 			newId, err := estore.Add(newevent)
 			if err != nil {
@@ -256,13 +268,13 @@ func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 				fmt.Println(sErr)
 
 				response := copyList(resptemplate)
-				response.PushBack([]byte("ERROR " + sErr))
+				response.PushBack(zFrame("ERROR " + sErr))
 				respchan <- listToFrames(response)
 			} else {
 				// the event was added
 				response := copyList(resptemplate)
-				response.PushBack([]byte("PUBLISHED"))
-				response.PushBack([]byte(newId))
+				response.PushBack(zFrame("PUBLISHED"))
+				response.PushBack(zFrame(newId))
 				respchan <- listToFrames(response)
 			}
 		}
@@ -273,7 +285,7 @@ func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 			// TODO: Migrate to logging system
 			fmt.Println(errstr)
 			response := copyList(resptemplate)
-			response.PushBack([]byte("ERROR " + errstr))
+			response.PushBack(zFrame("ERROR " + errstr))
 			respchan <- listToFrames(response)
 		} else {
 			estreamprefix := parts.Remove(parts.Front())
@@ -282,9 +294,9 @@ func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 
 			events := make(chan StoredEvent)
 			req := QueryRequest{
-				Stream: estreamprefix.([]byte),
-				FromId: fromid.([]byte),
-				ToId: toid.([]byte),
+				Stream: estreamprefix.(zFrame),
+				FromId: fromid.(zFrame),
+				ToId: toid.(zFrame),
 			}
 			go estore.Query(req, events)
 			for eventdata := range(events) {
@@ -296,7 +308,7 @@ func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 				respchan <- listToFrames(response)
 			}
 			response := copyList(resptemplate)
-			response.PushBack([]byte("END"))
+			response.PushBack(zFrame("END"))
 			respchan <- listToFrames(response)
 		}
 	default:
@@ -309,18 +321,18 @@ func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 		// TODO: Migrate to logging system
 		fmt.Println(errstr)
 		response := copyList(resptemplate)
-		response.PushBack([]byte("ERROR " + errstr))
+		response.PushBack(zFrame("ERROR " + errstr))
 		respchan <- listToFrames(response)
 	}
 }
 
 // Convert a doubly linked list of message frames to a slice of message
 // fram
-func listToFrames(l *list.List) [][]byte {
-	frames := make([][]byte, l.Len())
+func listToFrames(l *list.List) zMsg {
+	frames := make(zMsg, l.Len())
 	i := 0
 	for e := l.Front(); e != nil; e = e.Next() {
-		frames[i] = e.Value.([]byte)
+		frames[i] = e.Value.(zFrame)
 	}
 	return frames
 }
