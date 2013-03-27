@@ -203,7 +203,6 @@ func publishAllSavedEvents(toPublish chan StoredEvent, evpub zmq.Socket) {
 func handleRequest(respchan chan [][]byte, estore *EventStore, msg [][]byte) {
 
 	// TODO: Rename to 'framelist'
-	// TODO: Avoid this creation and move it into copyList.
 	parts := list.New()
 	for _, msgpart := range msg {
 		parts.PushBack(msgpart)
