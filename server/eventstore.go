@@ -483,10 +483,6 @@ func newEventStoreKey(data []byte) (*eventStoreKey, error) {
 	res := new(eventStoreKey)
 	pieces := bytes.Split(data, groupSep)
 	if len(pieces) > 2 {
-		// FIXME: This code expects the key to not contain
-		// `groupSep`. It is highly possible the separator is
-		// contained here. Therefor, the keyId needs to be base
-		// 64 encoded.
 		codedKeyId := pieces[len(pieces)-1]
 		enc := base64.StdEncoding
 		_, err := enc.Decode(res.keyId, codedKeyId)
