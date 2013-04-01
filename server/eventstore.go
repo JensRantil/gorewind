@@ -458,6 +458,12 @@ type eventStoreKey struct {
 // otherwise.
 func (v *eventStoreKey) toBytes() []byte {
 	var pieces [][]byte
+	if bytes.Contains(v.groupKey, groupSep) {
+		// Generally, this should not happen since groupSep is
+		// purely a constant set by a developer. That said, you
+		// could see this check as a runtime assertion.
+		log.Panicln("groupKey must not contain groupSep:", v.groupKey)
+	}
 	if v.keyId != nil {
 		pieces = make([][]byte, 3)
 		pieces[0] = v.groupKey
