@@ -22,7 +22,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
+	"encoding/base64"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/descriptor"
 	"github.com/syndtr/goleveldb/leveldb/comparer"
@@ -81,7 +83,12 @@ func initStreamIdGenerator(db *leveldb.DB) (*streamIdGenerator, error) {
 	it := db.NewIterator(ro)
 	it.Seek(searchKey.toBytes())
 	for it.Valid() {
-		key := newEventStoreKey(it.Key())
+		key, err := newEventStoreKey(it.Key())
+		if err != nil {
+			log.Println("A key could not be deserialized:")
+			log.Println(string(it.Key()))
+			return nil, err
+		}
 		if bytes.Compare(key.groupKey, streamPrefix) != 0 {
 			// We have reached the end of the stream listing
 			break
@@ -90,7 +97,7 @@ func initStreamIdGenerator(db *leveldb.DB) (*streamIdGenerator, error) {
 		stream := key.key
 		latestId := loadByteCounter(it.Value())
 		nextId := latestId.NewIncrementedCounter()
-		err := gen.Register(stream, nextId)
+		err = gen.Register(stream, nextId)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +338,15 @@ func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 	defer close(res)
 	for i.Next() {
-		curKey := newEventStoreKey(i.Key())
+		curKey, err := newEventStoreKey(i.Key())
+		if err != nil {
+			log.Println("A key could not be deserialized:")
+			// Panicing here, because this error most
+			// certainly needs to be looked at by a
+			// an operator.
+			log.Panicln(string(i.Key()))
+		}
+
 		if bytes.Compare(curKey.groupKey, streamPrefix) != 0 {
 			break
 		}
@@ -447,7 +462,7 @@ func (v *eventStoreKey) toBytes() []byte {
 		pieces = make([][]byte, 3)
 		pieces[0] = v.groupKey
 		pieces[1] = v.key
-		pieces[2] = v.keyId
+		base64.StdEncoding.Encode(pieces[2], v.keyId)
 	} else {
 		pieces = make([][]byte, 2)
 		pieces[0] = v.groupKey
@@ -458,11 +473,20 @@ func (v *eventStoreKey) toBytes() []byte {
 }
 
 // Convert a byte slice to a parsed eventStoreKey.
-func newEventStoreKey(data []byte) (*eventStoreKey) {
+func newEventStoreKey(data []byte) (*eventStoreKey, error) {
 	res := new(eventStoreKey)
 	pieces := bytes.Split(data, groupSep)
 	if len(pieces) > 2 {
-		res.keyId = pieces[len(pieces)-1]
+		// FIXME: This code expects the key to not contain
+		// `groupSep`. It is highly possible the separator is
+		// contained here. Therefor, the keyId needs to be base
+		// 64 encoded.
+		codedKeyId := pieces[len(pieces)-1]
+		enc := base64.StdEncoding
+		_, err := enc.Decode(res.keyId, codedKeyId)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(pieces) > 0 {
 		res.groupKey = pieces[0]
@@ -478,7 +502,7 @@ func newEventStoreKey(data []byte) (*eventStoreKey) {
 		keyPieces := pieces[1:upperIndex]
 		res.key = bytes.Join(keyPieces, groupSep)
 	}
-	return res
+	return res, nil
 }
 
 // Compare to another eventStoreKey. Returns -1 if this one is smaller
@@ -514,8 +538,22 @@ func (v* eventStreamComparer) Name() string {
 //
 // Used to minimize the size of index blocks and other data structures.
 func (v* eventStreamComparer) Separator(a, b []byte) []byte {
-	keyA := newEventStoreKey(a)
-	keyB := newEventStoreKey(b)
+	keyA, err := newEventStoreKey(a)
+	if err != nil {
+		log.Println("A key could not be deserialized:")
+		log.Println(string(a))
+
+		// Always a safe result
+		return a
+	}
+	keyB, err := newEventStoreKey(b)
+	if err != nil {
+		log.Println("A key could not be deserialized:")
+		log.Println(string(b))
+
+		// Always a safe result
+		return a
+	}
 
 	if c := bytes.Compare(keyA.groupKey, keyB.groupKey); c != 0 {
 		bcomp := comparer.BytesComparer{}
@@ -548,7 +586,14 @@ func (v* eventStreamComparer) Separator(a, b []byte) []byte {
 //
 // Used to minimize the size of index blocks and other data structures.
 func (v* eventStreamComparer) Successor(b []byte) []byte {
-	keyB := newEventStoreKey(b)
+	keyB, err := newEventStoreKey(b)
+	if err != nil {
+		log.Println("A key could not be deserialized:")
+		log.Println(string(b))
+
+		// Always a safe result
+		return b
+	}
 	bcomp := comparer.BytesComparer{}
 	successor := eventStoreKey{
 		bcomp.Successor(keyB.groupKey),
@@ -559,7 +604,17 @@ func (v* eventStreamComparer) Successor(b []byte) []byte {
 }
 
 func (v* eventStreamComparer) Compare(a, b []byte) int {
-	keyA := newEventStoreKey(a)
-	keyB := newEventStoreKey(b)
+	keyA, err := newEventStoreKey(a)
+	if err != nil {
+		log.Println("A key could not be deserialized:")
+		// Unrecoverable error here. This should never happen!
+		log.Panicln(string(a))
+	}
+	keyB, err := newEventStoreKey(b)
+	if err != nil {
+		log.Println("A key could not be deserialized:")
+		// Unrecoverable error here. This should never happen!
+		log.Panicln(string(b))
+	}
 	return keyA.Compare(keyB)
 }
