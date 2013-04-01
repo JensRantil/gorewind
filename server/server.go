@@ -21,7 +21,7 @@ package server
 import (
 	"bytes"
 	"errors"
-	"fmt"
+	"log"
 	"container/list"
 	zmq "github.com/alecthomas/gozmq"
 )
@@ -170,7 +170,7 @@ func loopServer(estore *EventStore, evpubsock, frontend zmq.Socket) {
 			go asyncPoll(pollchan, toPoll)
 		case frames := <-respchan:
 			if err := frontend.SendMultipart(frames, 0); err != nil {
-				fmt.Println(err)
+				log.Println(err)
 			}
 		}
 	}
@@ -190,8 +190,7 @@ func publishAllSavedEvents(toPublish chan StoredEvent, evpub zmq.Socket) {
 		msg[2] = event.Data
 
 		if err := evpub.SendMultipart(msg, 0); err != nil {
-			// TODO: Use logger
-			fmt.Println(err)
+			log.Println(err)
 		}
 	}
 }
@@ -235,8 +234,7 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 
 	if parts.Len() == 0 {
 		errstr := "Incoming command was empty. Ignoring it."
-		// TODO: Migrate to logging system
-		fmt.Println(errstr)
+		log.Println(errstr)
 		response := copyList(resptemplate)
 		response.PushBack(zFrame("ERROR " + errstr))
 		respchan <- listToFrames(response)
@@ -249,8 +247,7 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 		parts.Remove(parts.Front())
 		if parts.Len() != 2 {
 			errstr := "Wrong number of frames for PUBLISH."
-			// TODO: Migrate to logging system
-			fmt.Println(errstr)
+			log.Println(errstr)
 			response := copyList(resptemplate)
 			response.PushBack(zFrame("ERROR " + errstr))
 			respchan <- listToFrames(response)
@@ -263,9 +260,8 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 			}
 			newId, err := estore.Add(newevent)
 			if err != nil {
-				// TODO: Migrate to logging system
 				sErr := err.Error()
-				fmt.Println(sErr)
+				log.Println(sErr)
 
 				response := copyList(resptemplate)
 				response.PushBack(zFrame("ERROR " + sErr))
@@ -282,8 +278,7 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 		parts.Remove(parts.Front())
 		if parts.Len() != 3 {
 			errstr := "Wrong number of frames for QUERY."
-			// TODO: Migrate to logging system
-			fmt.Println(errstr)
+			log.Println(errstr)
 			response := copyList(resptemplate)
 			response.PushBack(zFrame("ERROR " + errstr))
 			respchan <- listToFrames(response)
@@ -318,8 +313,7 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 		// TODO: Move the chunk of code below into a separate
 		// function and reuse for similar piece of code above.
 		errstr := "Unknown request type."
-		// TODO: Migrate to logging system
-		fmt.Println(errstr)
+		log.Println(errstr)
 		response := copyList(resptemplate)
 		response.PushBack(zFrame("ERROR " + errstr))
 		respchan <- listToFrames(response)

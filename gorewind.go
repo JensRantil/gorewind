@@ -19,7 +19,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log"
 	"os"
 	"github.com/jensrantil/gorewind/server"
 	"github.com/syndtr/goleveldb/leveldb/descriptor"
@@ -42,23 +42,20 @@ var (
 func main() {
 	flag.Parse()
 
-	// TODO: Use logging framework
-	fmt.Println("Event store to use:", *eventStorePath)
-	fmt.Println("Command socket path:", *commandSocketZPath)
-	fmt.Println("Event publishing socket path:", *eventPublishZPath)
-	fmt.Println()
+	log.Println("Event store to use:", *eventStorePath)
+	log.Println("Command socket path:", *commandSocketZPath)
+	log.Println("Event publishing socket path:", *eventPublishZPath)
+	log.Println()
 
 	desc, err := descriptor.OpenFile(*eventStorePath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "could not create descriptor")
-		panic(err)
+		log.Panicln("could not create DB descriptor")
 	}
 	defer desc.Close()
 
 	estore, err := server.NewEventStore(desc)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "could not create event store")
-		panic(err)
+		log.Panicln(os.Stderr, "could not create event store")
 	}
 	defer estore.Close()
 
