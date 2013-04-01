@@ -494,8 +494,15 @@ func newEventStoreKey(data []byte) (*eventStoreKey, error) {
 		res.groupKey = pieces[0]
 	}
 	if len(pieces) > 1 {
-		var upperIndex int
-		// FIXME: Handle the case when len(pieces)>=max(int)
+		var upperIndex uint
+		if len(pieces) > math.MaxUint32 {
+			// Handle the case when len(pieces)>=max(int).
+			// Note that `int` can be 64 bit on Go 1.1. Keys
+			// are supposed to be small in size, so I don't
+			// expect this to be an issue.
+			msg := "too many pieces for deserialization"
+			return nil, errors.New(msg)
+		}
 		if res.keyId != nil {
 			upperIndex = len(pieces) - 1
 		} else {
