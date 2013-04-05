@@ -219,9 +219,6 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 		parts.PushBack(msgpart)
 	}
 
-	// TODO: Possibly wrap ZeroMQ router frames into a Type before
-	// calling this method. That would yield a nicer API without
-	// nitty gritty ZeroMQ details.
 	resptemplate := list.New()
 	emptyFrame := zFrame("")
 	for true {
