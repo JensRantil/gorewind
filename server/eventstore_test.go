@@ -30,14 +30,14 @@ type comparatorTest struct {
 	expectedResult int
 }
 
-func testComparater(t *testing.T, test comparatorTest, c EventStreamComparer) {
+func testComparater(t *testing.T, test comparatorTest, c eventStreamComparer) {
 	testComparator(t, test, c)
 	testSeparator(t, test, c)
 	testSuccessor(t, test.a, c)
 	testSuccessor(t, test.b, c)
 }
 
-func testSeparator(t *testing.T, test comparatorTest, c EventStreamComparer) {
+func testSeparator(t *testing.T, test comparatorTest, c eventStreamComparer) {
 	ba := []byte(test.a)
 	bb := []byte(test.b)
 	res := c.Separator(ba, bb)
@@ -58,7 +58,7 @@ func testSeparator(t *testing.T, test comparatorTest, c EventStreamComparer) {
 	}
 }
 
-func testComparator(t *testing.T, test comparatorTest, comparer EventStreamComparer) {
+func testComparator(t *testing.T, test comparatorTest, comparer eventStreamComparer) {
 	res := comparer.Compare([]byte(test.a), []byte(test.b))
 	if res != test.expectedResult {
 		t.Errorf("a: %s", test.a)
@@ -68,7 +68,7 @@ func testComparator(t *testing.T, test comparatorTest, comparer EventStreamCompa
 	}
 }
 
-func testSuccessor(t *testing.T, s string, comparer EventStreamComparer) {
+func testSuccessor(t *testing.T, s string, comparer eventStreamComparer) {
 	bs := []byte(s)
 	shorter := comparer.Successor(bs)
 	if len(shorter) > len(bs) {
@@ -80,7 +80,7 @@ func testSuccessor(t *testing.T, s string, comparer EventStreamComparer) {
 }
 
 func TestComparator(t *testing.T) {
-	comparer := EventStreamComparer{}
+	comparer := eventStreamComparer{}
 	tests := []comparatorTest{
 		comparatorTest{"g:a", "g:a", 0},
 		comparatorTest{"g:a", "g:b", -1},
@@ -116,100 +116,30 @@ func TestComparator(t *testing.T) {
 }
 
 type evStoreKeySerTest struct {
-	origin string,
-	group string,
-	key string,
-	keyId *big.Int,
+	origin string
+	group string
+	key string
+	keyId byteCounter
 }
 
 func TestEventStoreKeySerialization(t *testing.T) {
-	f := func(groupId, key []byte, keyId int) bool {
+	f := func(groupId, key, bKeyId []byte) bool {
 		// GroupId must not contain any :
-		bytes.Replace(groupId, ":", "", -1)
+		bytes.Replace(groupId, []byte(":"), []byte(""), -1)
 
-		keyIdBytes := []byte(strconv.Itoa(keyId))
-		data := bytes.Join([]byte{
+		ev := eventStoreKey{
 			groupId,
 			key,
-			keyIdBytes,
-		}, []byte(":"))
+			loadByteCounter(bKeyId),
+		}
 
-		parsedAndSerialized := newEventStoreKey(data).bytes()
-		return bytes.Compare(parsedAndSerialized, bytes) == 0
+		parsed, err := newEventStoreKey(ev.toBytes())
+		if err != nil {
+			return false
+		}
+		return parsed.Compare(&ev) == 0
 	}
 	if err := quick.Check(f, nil); err != nil {
 		t.Error("QuickTest failed:", err)
 	}
-
-	tests := []evStoreKeySerTest{
-		evStoreKeySerTest{
-			"g:a",
-			"g",
-			"a",
-			nil,
-		},
-		evStoreKeySerTest{
-			"g:a:1"
-			"g",
-			"a",
-			big.NewInt(1),
-		},
-		// Test cases where there are multiple colon keys in the
-		// middle.
-		evStoreKeySerTest{
-			"g:a:b:1"
-			"g",
-			"a:b",
-			big.NewInt(1),
-		},
-		evStoreKeySerTest{
-			"g:a:b"
-			"g",
-			"a:b",
-			nil
-		},
-		evStoreKeySerTest{
-			"h:a:b:2"
-			"h",
-			"a:b",
-			big.NewInt(2),
-		},
-		evStoreKeySerTest{
-			"h:a:b:c1"
-			"h",
-			"a:b:c1",
-			nil
-		},
-		evStoreKeySerTest{
-			"h:a:b:11"
-			"h",
-			"a:b",
-			big.NewInt(11),
-		},
-	}
-	for _, test := range tests {
-		key := newEventStoreKey([]byte(test.origin))
-		if bytes.Compare(key.groupKey, []byte(test.group) != 0 {
-			t.Error("Wrong groupkey for:", test.origin)
-			t.Error("Expected:", test.group)
-			t.Error("Got:     ", test.groupKey)
-		}
-		if bytes.Compare(key.key, []byte(test.key) != 0 {
-			t.Error("Wrong key for:", test.origin)
-			t.Error("Expected:", test.group)
-			t.Error("Got:     ", test.groupKey)
-		}
-		switch {
-		case test.keyId != nil && key.keyId == nil:
-			t.Error("KeyId was nil, not expected.")
-		case test.keyId == nil && key.keyId != nil:
-			t.Error("KeyId was not nil, expected it to be.")
-		case test.keyId != nil && key.keyId != nil:
-			if test.keyId.Cmp(key.keyId) != 0 {
-				t.Error("Wrong keyId.")
-				t.Error("Expected:", test.keyId.String())
-				t.Error("Was:     ", key.keyId.String())
-			}
-	}
-
 }
