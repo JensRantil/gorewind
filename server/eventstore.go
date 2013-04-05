@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"sync"
 	"encoding/base64"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -494,8 +495,8 @@ func newEventStoreKey(data []byte) (*eventStoreKey, error) {
 		res.groupKey = pieces[0]
 	}
 	if len(pieces) > 1 {
-		var upperIndex uint
-		if len(pieces) > math.MaxUint32 {
+		var upperIndex int
+		if len(pieces) > math.MaxInt32 {
 			// Handle the case when len(pieces)>=max(int).
 			// Note that `int` can be 64 bit on Go 1.1. Keys
 			// are supposed to be small in size, so I don't
