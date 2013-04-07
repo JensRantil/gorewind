@@ -23,6 +23,8 @@ import (
 	"errors"
 	"log"
 	"container/list"
+	"time"
+	"sync"
 	zmq "github.com/alecthomas/gozmq"
 )
 
@@ -53,6 +55,38 @@ type Server struct {
 	evpubsock *zmq.Socket
 	commandsock *zmq.Socket
 	context *zmq.Context
+
+	runningMutex sync.Mutex
+	running bool
+	stopChan chan bool
+}
+
+// IsRunning returns true if the server is running, false otherwise.
+func (v *Server) IsRunning() bool {
+	v.runningMutex.Lock()
+	defer v.runningMutex.Unlock()
+	return v.running
+}
+
+// Stop stops the server.
+func (v* Server) Stop() error {
+	if v.IsRunning() {
+		return errors.New("Not running.")
+	}
+
+	select {
+	case v.stopChan <- true:
+	default:
+		return errors.New("Stop already signalled.")
+	}
+	<-v.stopChan
+	// v.running is modified by Server.Run(...)
+
+	if v.IsRunning() {
+		return errors.New("Signalled stopped, but never stopped.")
+	}
+
+	return nil
 }
 
 // Initialize a new event store server and return a handle to it. The
@@ -68,6 +102,7 @@ func New(params *InitParams) (*Server, error) {
 
 	server := Server{
 		params: *params,
+		running: false,
 	}
 
 	var allOkay *bool = new(bool)
@@ -117,25 +152,49 @@ func (v *Server) closeZmq() {
 	v.context = nil
 }
 
+func (v *Server) setRunningState(newState bool) {
+	v.runningMutex.Lock()
+	defer v.runningMutex.Unlock()
+	v.running = newState
+}
+
 // Runs the server that distributes requests to workers.
 // Panics on error since it is an essential piece of code required to
 // run the application correctly.
 func (v *Server) Run() {
-	loopServer((*v).params.Store, *(*v).evpubsock, *(*v).commandsock)
+	v.setRunningState(true)
+	defer v.setRunningState(false)
+	loopServer((*v).params.Store, *(*v).evpubsock, *(*v).commandsock, v.stopChan)
 }
 
 // The result of an asynchronous zmq.Poll call.
 type zmqPollResult struct {
-	nbrOfChanges int
 	err error
 }
 
 // Polls a bunch of ZeroMQ sockets and notifies the result through a
 // channel. This makes it possible to combine ZeroMQ polling with Go's
 // own built-in channels.
-func asyncPoll(notifier chan zmqPollResult, items zmq.PollItems) {
-	a, b := zmq.Poll(items, -1)
-	notifier <- zmqPollResult{a, b}
+func asyncPoll(notifier chan zmqPollResult, items zmq.PollItems, stop chan bool) {
+	for {
+		timeout := time.Duration(1)*time.Second
+		count, err := zmq.Poll(items, int64(timeout))
+		if count > 0 || err != nil {
+			notifier <- zmqPollResult{err}
+		}
+
+		select {
+		case <-stop:
+			stop <- true
+			return
+		default:
+		}
+	}
+}
+
+func stopPoller(cancelChan chan bool) {
+	cancelChan <- true
+	<-cancelChan
 }
 
 // The core ZeroMQ messaging loop. Handles requests and responses
@@ -147,7 +206,8 @@ func asyncPoll(notifier chan zmqPollResult, items zmq.PollItems) {
 // copied in-memory. If this becomes a bottleneck in the future,
 // multiple router sockets can be hooked to this final router to scale
 // message copying.
-func loopServer(estore *EventStore, evpubsock, frontend zmq.Socket) {
+func loopServer(estore *EventStore, evpubsock, frontend zmq.Socket,
+stop chan bool) {
 	toPoll := zmq.PollItems{
 		zmq.PollItem{Socket: frontend, zmq.Events: zmq.POLLIN},
 	}
@@ -158,20 +218,30 @@ func loopServer(estore *EventStore, evpubsock, frontend zmq.Socket) {
 
 	pollchan := make(chan zmqPollResult)
 	respchan := make(chan zMsg)
-	go asyncPoll(pollchan, toPoll)
+
+	pollCancel := make(chan bool)
+	defer stopPoller(pollCancel)
+
+	go asyncPoll(pollchan, toPoll, pollCancel)
 	for {
 		select {
-		case <- pollchan:
-			if toPoll[0].REvents&zmq.POLLIN != 0 {
+		case res := <-pollchan:
+			if res.err != nil {
+				log.Print("Could not poll:", res.err)
+			}
+			if res.err == nil && toPoll[0].REvents&zmq.POLLIN != 0 {
 				msg, _ := toPoll[0].Socket.RecvMultipart(0)
 				zmsg := zMsg(msg)
 				go handleRequest(respchan, estore, zmsg)
 			}
-			go asyncPoll(pollchan, toPoll)
+			go asyncPoll(pollchan, toPoll, pollCancel)
 		case frames := <-respchan:
 			if err := frontend.SendMultipart(frames, 0); err != nil {
 				log.Println(err)
 			}
+		case <- stop:
+			stop <- true
+			return
 		}
 	}
 }
