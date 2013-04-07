@@ -21,7 +21,7 @@ import (
 	"flag"
 	"log"
 	"os"
-	"github.com/jensrantil/gorewind/server"
+	"./server"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
