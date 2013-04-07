@@ -22,7 +22,7 @@ import (
 	"log"
 	"os"
 	"github.com/jensrantil/gorewind/server"
-	"github.com/syndtr/goleveldb/leveldb/descriptor"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
 
@@ -47,13 +47,13 @@ func main() {
 	log.Println("Event publishing socket path:", *eventPublishZPath)
 	log.Println()
 
-	desc, err := descriptor.OpenFile(*eventStorePath)
+	stor, err := storage.OpenFile(*eventStorePath)
 	if err != nil {
-		log.Panicln("could not create DB descriptor")
+		log.Panicln("could not create DB storage")
 	}
-	defer desc.Close()
+	defer stor.Close()
 
-	estore, err := server.NewEventStore(desc)
+	estore, err := server.NewEventStore(stor)
 	if err != nil {
 		log.Panicln(os.Stderr, "could not create event store")
 	}

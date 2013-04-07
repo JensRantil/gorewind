@@ -27,7 +27,7 @@ import (
 	"sync"
 	"encoding/base64"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/descriptor"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 	"github.com/syndtr/goleveldb/leveldb/comparer"
 	iter "github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -45,7 +45,7 @@ type EventStore struct {
 }
 
 // Create a new event store instance.
-func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
+func NewEventStore(stor storage.Storage) (*EventStore, error) {
 	estore := new(EventStore)
 
 	ePublishers := make(map[chan StoredEvent]chan StoredEvent)
@@ -55,7 +55,7 @@ func NewEventStore(desc descriptor.Desc) (*EventStore, error) {
 		Flag: opt.OFCreateIfMissing,
 		Comparer: &eventStreamComparer{},
 	}
-	db, err := leveldb.Open(desc, options)
+	db, err := leveldb.Open(stor, options)
 	if err != nil {
 		return nil, err
 	}
