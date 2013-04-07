@@ -189,9 +189,9 @@ func wrapBytes(bs []byte) {
 }
 
 // Create a brand new incremented byteCounter based on a previous one.
-func (v *byteCounter) NewIncrementedCounter() (incr byteCounter) {
-	incr = make([]byte, len(*v), len(*v) + 1)
-	copy(incr, *v)
+func (v byteCounter) NewIncrementedCounter() (incr byteCounter) {
+	incr = make([]byte, len(v), len(v) + 1)
+	copy(incr, v)
 
 	reverseBytes(incr)
 	incr[0] += 1
@@ -469,7 +469,8 @@ func (v *eventStoreKey) toBytes() []byte {
 		pieces = make([][]byte, 3)
 		pieces[0] = v.groupKey
 		pieces[1] = v.key
-		base64.StdEncoding.Encode(pieces[2], v.keyId)
+		sKeyId := base64.StdEncoding.EncodeToString(v.keyId)
+		pieces[2] = []byte(sKeyId)
 	} else {
 		pieces = make([][]byte, 2)
 		pieces[0] = v.groupKey
@@ -486,10 +487,11 @@ func newEventStoreKey(data []byte) (*eventStoreKey, error) {
 	if len(pieces) > 2 {
 		codedKeyId := pieces[len(pieces)-1]
 		enc := base64.StdEncoding
-		_, err := enc.Decode(res.keyId, codedKeyId)
+		bDecodedKeyId, err := enc.DecodeString(string(codedKeyId))
 		if err != nil {
 			return nil, err
 		}
+		res.keyId = bDecodedKeyId
 	}
 	if len(pieces) > 0 {
 		res.groupKey = pieces[0]
