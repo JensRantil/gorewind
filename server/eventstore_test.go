@@ -143,3 +143,5 @@ func TestEventStoreKeySerialization(t *testing.T) {
 		t.Error("QuickTest failed:", err)
 	}
 }
+
+// TODO: Test byteCounter
