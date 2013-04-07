@@ -74,7 +74,7 @@ func New(params *InitParams) (*Server, error) {
 	*allOkay = false
 	defer func() {
 		if (!*allOkay) {
-			server.Close()
+			server.closeZmq()
 		}
 	}()
 
@@ -108,7 +108,7 @@ func New(params *InitParams) (*Server, error) {
 	return &server, nil
 }
 
-func (v *Server) Close() {
+func (v *Server) closeZmq() {
 	(*v.evpubsock).Close()
 	v.evpubsock = nil
 	(*v.commandsock).Close()
