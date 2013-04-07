@@ -21,6 +21,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"os/signal"
 	"github.com/JensRantil/gorewind/server"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 )
@@ -69,7 +70,15 @@ func main() {
 		panic(err.Error())
 	}
 
-	// FIXME: Handle SIGINT correctly and smoothly.
+	sigchan := make(chan os.Signal, 5)
+	serverStopper := func() {
+		sig := <-sigchan
+		if sig == os.Interrupt {
+			serv.Stop()
+		}
+	}
+	go serverStopper()
+	signal.Notify(sigchan)
 
 	serv.Run()
 }
