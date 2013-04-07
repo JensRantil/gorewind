@@ -214,7 +214,12 @@ type evStoreKeySerTest struct {
 func TestEventStoreKeySerialization(t *testing.T) {
 	f := func(groupId, key, bKeyId []byte) bool {
 		// GroupId must not contain any :
-		bytes.Replace(groupId, []byte(":"), []byte(""), -1)
+		groupId = bytes.Replace(groupId, groupSep, []byte(""), -1)
+		if bytes.Contains(groupId, groupSep) {
+			t.Log("It still contained separator:", groupSep)
+			t.Log("Bytes:", groupId)
+			return false
+		}
 
 		ev := eventStoreKey{
 			groupId,
