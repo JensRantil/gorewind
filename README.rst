@@ -2,9 +2,6 @@
 Rewind in Go
 ============
 
-.. image:: https://secure.travis-ci.org/JensRantil/gorewind.png?branch=develop
-   :target: http://travis-ci.org/#!/JensRantil/gorewind
-
 This is the next version of `Rewind`_. The intention is to bring higher
 concurrency and support for multiple streams. Initially only a single
 storage backend will be supported (LevelDB).
