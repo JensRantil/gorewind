@@ -189,9 +189,9 @@ func wrapBytes(bs []byte) {
 }
 
 // Create a brand new incremented byteCounter based on a previous one.
-func (v *byteCounter) NewIncrementedCounter() (incr byteCounter) {
-	incr = make([]byte, len(*v), len(*v) + 1)
-	copy(incr, *v)
+func (v byteCounter) NewIncrementedCounter() (incr byteCounter) {
+	incr = make([]byte, len(v), len(v) + 1)
+	copy(incr, v)
 
 	reverseBytes(incr)
 	incr[0] += 1

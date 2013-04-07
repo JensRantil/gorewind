@@ -25,8 +25,8 @@ import (
 
 
 type comparatorTest struct {
-	a string
-	b string
+	a eventStoreKey
+	b eventStoreKey
 	expectedResult int
 }
 
@@ -38,8 +38,8 @@ func testComparater(t *testing.T, test comparatorTest, c eventStreamComparer) {
 }
 
 func testSeparator(t *testing.T, test comparatorTest, c eventStreamComparer) {
-	ba := []byte(test.a)
-	bb := []byte(test.b)
+	ba := test.a.toBytes()
+	bb := test.b.toBytes()
 	res := c.Separator(ba, bb)
 	diff := c.Compare(ba, bb)
 	if diff >= 0 && bytes.Compare(res, ba) != 0 {
@@ -59,7 +59,7 @@ func testSeparator(t *testing.T, test comparatorTest, c eventStreamComparer) {
 }
 
 func testComparator(t *testing.T, test comparatorTest, comparer eventStreamComparer) {
-	res := comparer.Compare([]byte(test.a), []byte(test.b))
+	res := comparer.Compare(test.a.toBytes(), test.b.toBytes())
 	if res != test.expectedResult {
 		t.Errorf("a: %s", test.a)
 		t.Errorf("b: %s", test.b)
@@ -68,8 +68,8 @@ func testComparator(t *testing.T, test comparatorTest, comparer eventStreamCompa
 	}
 }
 
-func testSuccessor(t *testing.T, s string, comparer eventStreamComparer) {
-	bs := []byte(s)
+func testSuccessor(t *testing.T, s eventStoreKey, comparer eventStreamComparer) {
+	bs := s.toBytes()
 	shorter := comparer.Successor(bs)
 	if len(shorter) > len(bs) {
 		t.Errorf("Successor was longer: %s", s)
@@ -80,27 +80,101 @@ func testSuccessor(t *testing.T, s string, comparer eventStreamComparer) {
 }
 
 func TestComparator(t *testing.T) {
-	comparer := eventStreamComparer{}
 	tests := []comparatorTest{
-		comparatorTest{"g:a", "g:a", 0},
-		comparatorTest{"g:a", "g:b", -1},
-		comparatorTest{"g:a", "h:a", -1},
-		comparatorTest{"g:a:1", "g:a:1", 0},
-		comparatorTest{"g:a:1", "h:a:1", -1},
-		comparatorTest{"g:a:1", "h:a:2", -1},
-		comparatorTest{"g:a:1", "h:a:11", -1},
-		comparatorTest{"g:a:b:1", "g:a:b:11", -1},
-
-		// Test cases where there are multiple colon keys in the
-		// middle.
-		comparatorTest{"g:a:b", "g:a:b", 0},
-		comparatorTest{"g:a:b", "g:b:c", -1},
-		comparatorTest{"g:a:b", "h:a:b", -1},
-		comparatorTest{"g:a:b:1", "g:a:b:1", 0},
-		comparatorTest{"g:a:q:1", "h:a:q:1", -1},
-		comparatorTest{"g:a:b:1", "h:a:b:2", -1},
-		comparatorTest{"g:a:b:1", "h:a:b:11", -1},
+		comparatorTest{
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a"),
+				nil,
+			},
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a"),
+				nil,
+			},
+			0,
+		},
+		comparatorTest{
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a"),
+				nil,
+			},
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("b"),
+				nil,
+			},
+			-1,
+		},
+		comparatorTest{
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a"),
+				nil,
+			},
+			eventStoreKey{
+				[]byte("h"),
+				[]byte("a"),
+				nil,
+			},
+			-1,
+		},
+		comparatorTest{
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a"),
+				newByteCounter(),
+			},
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a"),
+				newByteCounter(),
+			},
+			0,
+		},
+		comparatorTest{
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a"),
+				newByteCounter(),
+			},
+			eventStoreKey{
+				[]byte("h"),
+				[]byte("a"),
+				newByteCounter(),
+			},
+			-1,
+		},
+		comparatorTest{
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a"),
+				newByteCounter().toBytes(),
+			},
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a"),
+				newByteCounter().NewIncrementedCounter(),
+			},
+			-1,
+		},
+		comparatorTest{
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a:b"),
+				newByteCounter(),
+			},
+			eventStoreKey{
+				[]byte("g"),
+				[]byte("a:b"),
+				newByteCounter().NewIncrementedCounter(),
+			},
+			-1,
+		},
 	}
+
+	comparer := eventStreamComparer{}
 	for _, test := range(tests) {
 		testComparator(t, test, comparer)
 		if test.expectedResult != 0 {
@@ -112,6 +186,21 @@ func TestComparator(t *testing.T) {
 			}
 			testComparator(t, invertedTest, comparer)
 		}
+
+		equalityTest := comparatorTest{
+			test.a,
+			test.a,
+			0,
+		}
+		testComparator(t, equalityTest, comparer)
+
+		equalityTest = comparatorTest{
+			test.b,
+			test.b,
+			0,
+		}
+		testComparator(t, equalityTest, comparer)
+
 	}
 }
 
