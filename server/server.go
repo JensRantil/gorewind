@@ -313,6 +313,7 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 	case "PUBLISH":
 		parts.Remove(parts.Front())
 		if parts.Len() != 2 {
+			// TODO: Constantify this error message
 			errstr := "Wrong number of frames for PUBLISH."
 			log.Println(errstr)
 			response := copyList(resptemplate)
@@ -344,6 +345,7 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 	case "QUERY":
 		parts.Remove(parts.Front())
 		if parts.Len() != 3 {
+			// TODO: Constantify this error message
 			errstr := "Wrong number of frames for QUERY."
 			log.Println(errstr)
 			response := copyList(resptemplate)
@@ -379,6 +381,7 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 
 		// TODO: Move the chunk of code below into a separate
 		// function and reuse for similar piece of code above.
+		// TODO: Constantify this error message
 		errstr := "Unknown request type."
 		log.Println(errstr)
 		response := copyList(resptemplate)
