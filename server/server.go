@@ -355,13 +355,13 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 			response.PushBack(zFrame("ERROR " + errstr))
 			respchan <- listToFrames(response)
 		} else {
-			estreamprefix := parts.Remove(parts.Front())
+			estream := parts.Remove(parts.Front())
 			fromid := parts.Remove(parts.Front())
 			toid := parts.Remove(parts.Front())
 
 			events := make(chan StoredEvent)
 			req := QueryRequest{
-				Stream: estreamprefix.(zFrame),
+				Stream: estream.(zFrame),
 				FromId: fromid.(zFrame),
 				ToId: toid.(zFrame),
 			}
