@@ -359,12 +359,12 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 			fromid := parts.Remove(parts.Front())
 			toid := parts.Remove(parts.Front())
 
-			events := make(chan StoredEvent)
 			req := QueryRequest{
 				Stream: estream.(zFrame),
 				FromId: fromid.(zFrame),
 				ToId: toid.(zFrame),
 			}
+			events := make(chan StoredEvent)
 			// TODO: Handle errors returned below
 			go estore.Query(req, events)
 			for eventdata := range(events) {
