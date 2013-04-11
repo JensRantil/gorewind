@@ -293,6 +293,9 @@ type QueryRequest struct {
 //
 // TODO: Also make the error checking asynchronously, to
 // minimize IO blocking when calling this function.
+//
+// TODO: Return the result channel instead. That way we don't force the
+// client to use a go routine.
 func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 	ro := &opt.ReadOptions{}
 	it := v.db.NewIterator(ro)

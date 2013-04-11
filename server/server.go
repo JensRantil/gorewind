@@ -362,6 +362,7 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 				FromId: fromid.(zFrame),
 				ToId: toid.(zFrame),
 			}
+			// TODO: Handle errors returned below
 			go estore.Query(req, events)
 			for eventdata := range(events) {
 				response := copyList(resptemplate)
