@@ -2,7 +2,7 @@
 Rewind in Go
 ============
 
-This is the next version of `Rewind`_. The intention is to bring higher
+This is the next generation of `Rewind`_. The intention is to bring higher
 concurrency and support for multiple streams. Initially only a single
 storage backend will be supported (LevelDB).
 
