@@ -206,6 +206,9 @@ func stopPoller(cancelChan chan bool) {
 // copied in-memory. If this becomes a bottleneck in the future,
 // multiple router sockets can be hooked to this final router to scale
 // message copying.
+//
+// TODO: Make this a type function of `Server` to remove a lot of
+// parameters.
 func loopServer(estore *EventStore, evpubsock, frontend zmq.Socket,
 stop chan bool) {
 	toPoll := zmq.PollItems{
