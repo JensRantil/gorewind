@@ -369,7 +369,7 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 			go estore.Query(req, events)
 			for eventdata := range(events) {
 				response := copyList(resptemplate)
-				response.PushBack(eventdata.Stream)
+				response.PushBack([]byte("EVENT"))
 				response.PushBack(eventdata.Id)
 				response.PushBack(eventdata.Data)
 
