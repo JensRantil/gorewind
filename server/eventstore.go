@@ -289,7 +289,9 @@ type QueryRequest struct {
 //
 // Currently this function will make error checks synchronously.  If all
 // looks good, streaming the results through `res` is done
-// asynchronously. TODO: Also make the error checking asynchronously, to
+// asynchronously.
+//
+// TODO: Also make the error checking asynchronously, to
 // minimize IO blocking when calling this function.
 func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
 	ro := &opt.ReadOptions{}
