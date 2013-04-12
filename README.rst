@@ -86,9 +86,9 @@ build Gorewind from code you need to do the following:
 
     $ git clone https://github.com/JensRantil/gorewind.git
     ...
-    $ git -v test ./server
+    $ go test -v ./server
     ... (make sure tests are not failing)
-    $ git build
+    $ go build
 
 ...and voilá, `gorewind` binary should have been created.
 
