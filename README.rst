@@ -14,9 +14,9 @@ Currently, this project is highly experimental and alpha.
 
 Other things:
 
- * Tests are exeucting using `go test -v ./server`.
+* Tests are exeucting using `go test -v ./server`.
 
- * I'll try to stick to http://www.semver.org when it comes to versioning.
+* I'll try to stick to http://www.semver.org when it comes to versioning.
 
 Background
 ==========
@@ -223,11 +223,11 @@ There are two types of responses that can be given upon a query:
   * Each *event message* is a multipart message consisting of three
     frames:
 
-   1. The ASCII content "EVENT".
+   * The ASCII content "EVENT".
 
-   2. The *event id* for the event in question.
+   * The *event id* for the event in question.
 
-   3. The *event data* for the event in question.
+   * The *event data* for the event in question.
 
   * The *stop message* is a single framed message consisting of the
     ASCII content ``END``. After the stop message has been sent, no
