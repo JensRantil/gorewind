@@ -159,33 +159,26 @@ func loadByteCounter(bs []byte) byteCounter {
 
 // Reverse a byte slice.
 func reverseBytes(b []byte) {
-	stop := len(b) / 2
 	rIndex := len(b) - 1
-	for lIndex, _ := range b {
-		if lIndex >= stop {
-			return
-		}
-		rIndex -= 1
-		// TODO: Benchmark if using range element below would
-		// make an improvement in speed.
+	for lIndex := range b[0:(len(b)/2)] {
 		b[rIndex], b[lIndex] = b[lIndex], b[rIndex]
+		rIndex -= 1
 	}
 }
 
 // Helper function used when incrementing a byteCounter.
-func wrapBytes(bs []byte) {
+func wrapBytes(bs []byte) []byte {
 	for i, el := range bs {
-		if el != 255 {
+		if el < 255 {
 			bs[i] += 1
-			return
+			return bs
 		} else {
+			// el == 255
 			bs[i] = 0
-			if i == len(bs) - 1 {
-				bs = append(bs, 1)
-				return
-			}
 		}
 	}
+	bs = append(bs, 1)
+	return bs
 }
 
 // Create a brand new incremented byteCounter based on a previous one.
@@ -194,11 +187,7 @@ func (v byteCounter) NewIncrementedCounter() (incr byteCounter) {
 	copy(incr, v)
 
 	reverseBytes(incr)
-	incr[0] += 1
-	if incr[0] == 0 {
-		// if we wrapped
-		wrapBytes(incr[1:])
-	}
+	incr = wrapBytes(incr)
 	reverseBytes(incr)
 	return
 }

@@ -238,4 +238,63 @@ func TestEventStoreKeySerialization(t *testing.T) {
 	}
 }
 
-// TODO: Test byteCounter
+func TestReverseBytes(t *testing.T) {
+	a := []byte{0, 255}
+	b := []byte{255, 0}
+	reverseBytes(a)
+	if bytes.Compare(a, b) != 0 {
+		t.Error("Not equal:", a, b)
+	}
+
+	a = []byte{0, 128, 255}
+	b = []byte{255, 128, 0}
+	reverseBytes(a)
+	if bytes.Compare(a, b) != 0 {
+		t.Error("Not equal:", a, b)
+	}
+
+	f := func(a []byte) bool {
+		b := make([]byte, len(a))
+		copy(b, a)
+		reverseBytes(b)
+		reverseBytes(b)
+		return bytes.Compare(a, b)==0
+	}
+	if err := quick.Check(f, nil); err != nil {
+		t.Error("QuickTest failed:", err)
+	}
+}
+
+func TestByteCounter(t *testing.T) {
+	a := []byte{255}
+	a = wrapBytes(a)
+	if len(a) <= 1 {
+		t.Error("Incorrect wrap:", a)
+	}
+
+	counter := newByteCounter()
+	for i:= 0 ; i < 5000 ; i++ {
+		if counter.Compare(counter) != 0 {
+			t.Error("Not equal to itself.")
+		}
+
+		reloaded := loadByteCounter(counter.toBytes())
+		if reloaded.Compare(counter) != 0 {
+			t.Error("Reloaded should be equal to itself")
+		}
+
+		nextC := counter.NewIncrementedCounter()
+		if nextC.Compare(counter) < 0 {
+			t.Error("Increment not greater:")
+			t.Error(" * Original: ", counter)
+			t.Error(" * Increment:", nextC)
+		}
+		if counter.Compare(nextC) > 0 {
+			t.Error("Original not smaller.:")
+			t.Error(" * Original: ", counter)
+			t.Error(" * Increment:", nextC)
+		}
+
+		counter = nextC
+	}
+}
