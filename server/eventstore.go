@@ -259,12 +259,6 @@ func (v *EventStore) Add(event UnstoredEvent) (EventId, error) {
 	return EventId(newId), nil
 }
 
-// Close an open event store. A previously closed event store must never
-// be used further.
-func (v* EventStore) Close() error {
-	return nil
-}
-
 // A query request.
 type QueryRequest struct {
 	Stream []byte
