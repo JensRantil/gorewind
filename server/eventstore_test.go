@@ -336,6 +336,18 @@ func TestEventStoreSimpleAddAndQuery(t *testing.T) {
 	}
 	_, err = es.Add(testEvent)
 
+	count := 0
+	streams := es.ListStreams(nil, 30)
+	for s := range(streams) {
+		if bytes.Compare(s, stream) != 0 {
+			t.Error("Unrecognized stream")
+		}
+		count++
+	}
+	if count != 1 {
+		t.Error("Did not expect any event stream to exist.")
+	}
+
 	res, err := es.Query(QueryRequest{Stream: stream})
 	if err != nil {
 		t.Fatal(err)
@@ -355,6 +367,15 @@ func TestQueryingEmptyStream(t *testing.T) {
 	es, err := setupInMemoryeventstore()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	count := 0
+	streams := es.ListStreams(nil, 30)
+	for _ = range(streams) {
+		count++
+	}
+	if count > 0 {
+		t.Error("Did not expect any event stream to exist.")
 	}
 
 	res, err := es.Query(QueryRequest{Stream: []byte("mystream")})

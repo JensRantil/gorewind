@@ -259,6 +259,40 @@ func (v *EventStore) Add(event UnstoredEvent) (EventId, error) {
 	return EventId(newId), nil
 }
 
+// List the available streams through a stream.
+func (v* EventStore) ListStreams(start StreamName, maxItems int) chan StreamName {
+	res := make(chan StreamName)
+	go func() {
+		defer close(res)
+		ro := &opt.ReadOptions{}
+		it := v.db.NewIterator(ro)
+
+		seekKey := eventStoreKey{
+			streamPrefix,
+			start,
+			nil,
+		}
+		it.Seek(seekKey.toBytes())
+
+		i := 0
+		for it.Valid() && i < maxItems {
+			key, err := newEventStoreKey(it.Key())
+			if err != nil {
+				// This should never happen
+				panic(err)
+			}
+			if bytes.Compare(key.groupKey, streamPrefix) != 0 {
+				break
+			}
+			res <- key.key
+			it.Next()
+			i++
+		}
+	}()
+	return res
+}
+
+
 // A query request.
 type QueryRequest struct {
 	Stream []byte
