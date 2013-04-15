@@ -21,6 +21,7 @@ import (
 	"testing"
 	"testing/quick"
 	"bytes"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
 
@@ -296,5 +297,66 @@ func TestByteCounter(t *testing.T) {
 		}
 
 		counter = nextC
+	}
+}
+
+func setupInMemoryeventstore() (es* EventStore, err error) {
+	stor := &storage.MemStorage{}
+	es, err = NewEventStore(stor)
+	return
+}
+
+func popAllEvents(c chan StoredEvent, t *testing.T) (es []StoredEvent) {
+	es = make([]StoredEvent, 0, 100)
+	for e := range c {
+		es = append(es, e)
+	}
+	return
+}
+
+func TestEventStoreSimpleAddAndQuery(t *testing.T) {
+	t.Parallel()
+
+	es, err := setupInMemoryeventstore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream := []byte("mystream")
+	testEvent := UnstoredEvent{
+		stream,
+		[]byte("this is my data"),
+	}
+	_, err = es.Add(testEvent)
+
+	res, err := es.Query(QueryRequest{Stream: stream})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	events := popAllEvents(res, t)
+	if len(events) != 1 {
+		t.Error("Wrong number of events:")
+		t.Error("Expected: 1")
+		t.Error("Was:     ", len(events))
+	}
+}
+
+func TestQueryingEmptyStream(t *testing.T) {
+	t.Parallel()
+
+	es, err := setupInMemoryeventstore()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := es.Query(QueryRequest{Stream: []byte("mystream")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := popAllEvents(res, t)
+	if len(events) != 0 {
+		t.Error("Wrong number of events:")
+		t.Error("Expected: 0")
+		t.Error("Was:     ", len(events), events)
 	}
 }
