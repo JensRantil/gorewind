@@ -424,12 +424,14 @@ func (g *streamIdGenerator) isRegistered(name StreamName) (exists bool) {
 // Register a new byteCounter.
 func (g *streamIdGenerator) Register(name StreamName, init byteCounter) error {
 	if g.isRegistered(name) {
+		// TODO: Constantify this error
 		return errors.New("name already registered")
 	}
 
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.counters[string(name)] = *newAtomicbyteCounter(init)
+
 	return nil
 }
 
