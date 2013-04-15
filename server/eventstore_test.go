@@ -81,6 +81,8 @@ func testSuccessor(t *testing.T, s eventStoreKey, comparer eventStreamComparer) 
 }
 
 func TestComparator(t *testing.T) {
+	t.Parallel()
+
 	tests := []comparatorTest{
 		comparatorTest{
 			eventStoreKey{
@@ -213,6 +215,8 @@ type evStoreKeySerTest struct {
 }
 
 func TestEventStoreKeySerialization(t *testing.T) {
+	t.Parallel()
+
 	f := func(groupId, key, bKeyId []byte) bool {
 		// GroupId must not contain any :
 		groupId = bytes.Replace(groupId, groupSep, []byte(""), -1)
@@ -240,6 +244,8 @@ func TestEventStoreKeySerialization(t *testing.T) {
 }
 
 func TestReverseBytes(t *testing.T) {
+	t.Parallel()
+
 	a := []byte{0, 255}
 	b := []byte{255, 0}
 	reverseBytes(a)
@@ -267,6 +273,8 @@ func TestReverseBytes(t *testing.T) {
 }
 
 func TestByteCounter(t *testing.T) {
+	t.Parallel()
+
 	a := []byte{255}
 	a = wrapBytes(a)
 	if len(a) <= 1 {
