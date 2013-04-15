@@ -536,9 +536,9 @@ func (o1 *eventStoreKey) Compare(o2 *eventStoreKey) int {
 	case o1.keyId != nil && o2.keyId != nil:
 		return o1.keyId.Compare(o2.keyId)
 	case o1.keyId != nil:
-		return 1
-	case o2.keyId != nil:
 		return -1
+	case o2.keyId != nil:
+		return 1
 	}
 	return 0
 }
