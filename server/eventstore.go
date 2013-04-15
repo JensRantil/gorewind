@@ -72,7 +72,7 @@ func NewEventStore(stor storage.Storage) (*EventStore, error) {
 
 // Helper function to initialize a streamIdGenerator.
 func initStreamIdGenerator(db *leveldb.DB) (*streamIdGenerator, error) {
-	gen := new(streamIdGenerator)
+	gen := newStreamIdGenerator()
 
 	searchKey := eventStoreKey{
 		streamPrefix,
