@@ -364,20 +364,28 @@ func handleRequest(respchan chan zMsg, estore *EventStore, msg zMsg) {
 				FromId: fromid.(zFrame),
 				ToId: toid.(zFrame),
 			}
-			events := make(chan StoredEvent)
-			// TODO: Handle errors returned below
-			go estore.Query(req, events)
-			for eventdata := range(events) {
-				response := copyList(resptemplate)
-				response.PushBack([]byte("EVENT"))
-				response.PushBack(eventdata.Id)
-				response.PushBack(eventdata.Data)
+			events, err := estore.Query(req)
 
+			if err != nil {
+				sErr := err.Error()
+				log.Println(sErr)
+
+				response := copyList(resptemplate)
+				response.PushBack(zFrame("ERROR " + sErr))
+				respchan <- listToFrames(response)
+			} else {
+				for eventdata := range(events) {
+					response := copyList(resptemplate)
+					response.PushBack([]byte("EVENT"))
+					response.PushBack(eventdata.Id)
+					response.PushBack(eventdata.Data)
+
+					respchan <- listToFrames(response)
+				}
+				response := copyList(resptemplate)
+				response.PushBack(zFrame("END"))
 				respchan <- listToFrames(response)
 			}
-			response := copyList(resptemplate)
-			response.PushBack(zFrame("END"))
-			respchan <- listToFrames(response)
 		}
 	default:
 		// TODO: Move these error strings out as constants of

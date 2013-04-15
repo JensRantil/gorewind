@@ -276,57 +276,71 @@ type QueryRequest struct {
 //
 // TODO: Also make the error checking asynchronously, to
 // minimize IO blocking when calling this function.
-//
-// TODO: Return the result channel instead. That way we don't force the
-// client to use a go routine.
-func (v *EventStore) Query(req QueryRequest, res chan StoredEvent) error {
+func (v *EventStore) Query(req QueryRequest) (chan StoredEvent, error) {
 	ro := &opt.ReadOptions{}
 	it := v.db.NewIterator(ro)
 
 	// To key
-	seekKey := eventStoreKey{
-		streamPrefix,
-		req.Stream,
-		loadByteCounter(req.ToId),
-	}
-	toKeyBytes := seekKey.toBytes()
-	it.Seek(toKeyBytes)
-	if bytes.Compare(toKeyBytes, it.Key()) != 0 {
-		bToId := string(toKeyBytes)
-		msg := fmt.Sprint("to key did not exist:", bToId)
-		return errors.New(msg)
+	var toKeyBytes []byte
+	if req.ToId != nil {
+		seekKey := eventStoreKey{
+			streamPrefix,
+			req.Stream,
+			loadByteCounter(req.ToId),
+		}
+		toKeyBytes = seekKey.toBytes()
+		it.Seek(toKeyBytes)
+		if bytes.Compare(toKeyBytes, it.Key()) != 0 {
+			bToId := string(toKeyBytes)
+			msg := fmt.Sprint("to key did not exist:", bToId)
+			return nil, errors.New(msg)
+		}
 	}
 
 	// From key
-	seekKey = eventStoreKey{
-		streamPrefix,
-		req.Stream,
-		loadByteCounter(req.FromId),
-	}
-	fromKeyBytes := seekKey.toBytes()
-	it.Seek(fromKeyBytes)
-	if bytes.Compare(fromKeyBytes, it.Key()) != 0 {
-		bFromId := string(fromKeyBytes)
-		msg := fmt.Sprint("from key did not exist:", bFromId)
-		return errors.New(msg)
+	var fromKeyBytes []byte
+	if req.FromId != nil {
+		seekKey := eventStoreKey{
+			streamPrefix,
+			req.Stream,
+			loadByteCounter(req.FromId),
+		}
+		fromKeyBytes = seekKey.toBytes()
+		it.Seek(fromKeyBytes)
+		if bytes.Compare(fromKeyBytes, it.Key()) != 0 {
+			bFromId := string(fromKeyBytes)
+			msg := fmt.Sprint("from key did not exist:", bFromId)
+			return nil, errors.New(msg)
+		}
+	} else {
+		seekKey := eventStoreKey{
+			streamPrefix,
+			req.Stream,
+			newByteCounter(),
+		}
+		fromKeyBytes = seekKey.toBytes()
+		it.Seek(fromKeyBytes)
 	}
 
-	diff := new(eventStreamComparer).Compare(fromKeyBytes, toKeyBytes)
-	if diff >= -1 {
-		msg := "The query was done in wrong chronological order."
-		return errors.New(msg)
+	if req.FromId != nil && req.ToId != nil {
+		diff := new(eventStreamComparer).Compare(fromKeyBytes, toKeyBytes)
+		if diff >= -1 {
+			msg := "The query was done in wrong chronological order."
+			return nil, errors.New(msg)
+		}
 	}
 
+	res := make(chan StoredEvent)
 	go safeQuery(it, req, res)
 
-	return nil
+	return res, nil
 }
 
 // Make the actual query. Sanity checks of the iterator i is expected to
 // have been done before calling this function.
 func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 	defer close(res)
-	for i.Next() {
+	for i.Valid() {
 		curKey, err := newEventStoreKey(i.Key())
 		if err != nil {
 			log.Println("A key could not be deserialized:")
@@ -354,6 +368,8 @@ func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 		if bytes.Compare(req.ToId, keyId) == 0 {
 			break
 		}
+
+		i.Next()
 	}
 }
 
