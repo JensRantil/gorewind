@@ -308,6 +308,58 @@ func TestByteCounter(t *testing.T) {
 	}
 }
 
+type byteSorter [][]byte
+func (b byteSorter) Len() int {
+	return len(b)
+}
+func (b byteSorter) Less(i, j int) bool {
+	return bytes.Compare(b[i], b[j]) < 0
+}
+func (b byteSorter) Swap(i, j int) {
+	b[i], b[j] = b[j], b[i]
+}
+
+func TestIdGenerator(t *testing.T) {
+	t.Parallel()
+
+	gen := newStreamIdGenerator()
+
+	n := 10
+	ids := make(byteSorter, 0, n)
+	for i:=0 ; i < n ; i++ {
+		id, err := gen.Allocate([]byte("mystream"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	sort.Sort(ids)
+	for i:=1 ; i < n ; i++ {
+		if bytes.Compare(ids[i-1], ids[i])==0 {
+			t.Fatal(i, "Found duplicate id:", ids[i])
+		}
+	}
+}
+
+func TestAtomicByteCounter(t *testing.T) {
+	t.Parallel()
+
+	gen := newAtomicbyteCounter(newByteCounter())
+
+	n := 10
+	ids := make(byteSorter, 0, n)
+	for i:=0 ; i < n ; i++ {
+		id := gen.Next()
+		ids = append(ids, id)
+	}
+	sort.Sort(ids)
+	for i:=1 ; i < n ; i++ {
+		if bytes.Compare(ids[i-1], ids[i])==0 {
+			t.Fatal(i, "Found duplicate id:", ids[i])
+		}
+	}
+}
+
 func setupInMemoryeventstore() (es* EventStore, err error) {
 	stor := &storage.MemStorage{}
 	es, err = NewEventStore(stor)
