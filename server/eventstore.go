@@ -392,9 +392,9 @@ func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 		}
 
 		resEvent := StoredEvent{
-			curKey.groupKey,
-			curKey.key,
-			curKey.keyId.toBytes(),
+			Stream: curKey.key,
+			Id: curKey.keyId.toBytes(),
+			Data: []byte(i.Value()),
 		}
 		res <- resEvent
 
