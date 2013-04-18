@@ -335,7 +335,7 @@ func (v *EventStore) Query(req QueryRequest) (chan StoredEvent, error) {
 	var fromKeyBytes []byte
 	if req.FromId != nil {
 		seekKey := eventStoreKey{
-			streamPrefix,
+			eventPrefix,
 			req.Stream,
 			loadByteCounter(req.FromId),
 		}
@@ -348,7 +348,7 @@ func (v *EventStore) Query(req QueryRequest) (chan StoredEvent, error) {
 		}
 	} else {
 		seekKey := eventStoreKey{
-			streamPrefix,
+			eventPrefix,
 			req.Stream,
 			newByteCounter(),
 		}
@@ -384,7 +384,7 @@ func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 			log.Panicln(string(i.Key()))
 		}
 
-		if bytes.Compare(curKey.groupKey, streamPrefix) != 0 {
+		if bytes.Compare(curKey.groupKey, eventPrefix) != 0 {
 			break
 		}
 
