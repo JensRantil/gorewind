@@ -418,14 +418,14 @@ func newAtomicbyteCounter(next byteCounter) (c *atomicbyteCounter) {
 	return
 }
 
-func (c *atomicbyteCounter) Next() (res byteCounter) {
+func (c *atomicbyteCounter) Next() byteCounter {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	res = c.nextUnused
+	res := c.nextUnused
 	c.nextUnused = c.nextUnused.NewIncrementedCounter()
 
-	return
+	return res
 }
 
 // A stream name.
@@ -435,7 +435,7 @@ type StreamName []byte
 type streamIdGenerator struct {
 	// key type must be string because []byte is not a valid key
 	// data type.
-	counters map[string]atomicbyteCounter
+	counters map[string]*atomicbyteCounter
 
 	// lock for counters
 	lock sync.RWMutex
@@ -443,7 +443,7 @@ type streamIdGenerator struct {
 
 func newStreamIdGenerator() (s *streamIdGenerator) {
 	s = new(streamIdGenerator)
-	s.counters = make(map[string]atomicbyteCounter)
+	s.counters = make(map[string]*atomicbyteCounter)
 	return
 }
 
@@ -464,7 +464,7 @@ func (g *streamIdGenerator) Register(name StreamName, init byteCounter) error {
 
 	g.lock.Lock()
 	defer g.lock.Unlock()
-	g.counters[string(name)] = *newAtomicbyteCounter(init)
+	g.counters[string(name)] = newAtomicbyteCounter(init)
 
 	return nil
 }
