@@ -399,7 +399,7 @@ func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 			break
 		}
 		keyId := curKey.keyId.toBytes()
-		if bytes.Compare(req.ToId, keyId) == 0 {
+		if req.ToId != nil && bytes.Compare(req.ToId, keyId) == 0 {
 			break
 		}
 
