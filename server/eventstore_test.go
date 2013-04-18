@@ -21,6 +21,8 @@ import (
 	"testing"
 	"testing/quick"
 	"bytes"
+	"crypto/rand"
+	"sync"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
@@ -374,45 +376,6 @@ func popAllEvents(c chan StoredEvent, t *testing.T) (es []StoredEvent) {
 	return
 }
 
-func TestEventStoreSimpleAddAndQuery(t *testing.T) {
-	t.Parallel()
-
-	es, err := setupInMemoryeventstore()
-	if err != nil {
-		t.Fatal(err)
-	}
-	stream := []byte("mystream")
-	testEvent := UnstoredEvent{
-		stream,
-		[]byte("this is my data"),
-	}
-	_, err = es.Add(testEvent)
-
-	count := 0
-	streams := es.ListStreams(nil, 30)
-	for s := range(streams) {
-		if bytes.Compare(s, stream) != 0 {
-			t.Error("Unrecognized stream")
-		}
-		count++
-	}
-	if count != 1 {
-		t.Error("Did not expect any event stream to exist.")
-	}
-
-	res, err := es.Query(QueryRequest{Stream: stream})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	events := popAllEvents(res, t)
-	if len(events) != 1 {
-		t.Error("Wrong number of events:")
-		t.Error("Expected: 1")
-		t.Error("Was:     ", len(events))
-	}
-}
-
 func TestQueryingEmptyStream(t *testing.T) {
 	t.Parallel()
 
@@ -440,4 +403,141 @@ func TestQueryingEmptyStream(t *testing.T) {
 		t.Error("Expected: 0")
 		t.Error("Was:     ", len(events), events)
 	}
+}
+
+func randBytes(n int) []byte {
+	res := make([]byte, n)
+	rand.Reader.Read(res)
+	return res
+}
+
+func testAddAndQuery(t *testing.T, es *EventStore, stream StreamName, n int) {
+	events := make([]StoredEvent, 0, n)
+	for i := 0 ; i < n ; i++ {
+		testEvent := UnstoredEvent{
+			Stream: stream,
+			Data: randBytes(10),
+		}
+		id, err := es.Add(testEvent)
+		for _, ev := range(events) {
+			if bytes.Compare(ev.Id, id)==0 {
+				t.Fatal("ID duplicate found.")
+			}
+		}
+
+		events = append(events, StoredEvent{
+			Stream: stream,
+			Id: id,
+			Data: testEvent.Data,
+		})
+
+		count := 0
+		streams := es.ListStreams(nil, 30)
+		for s := range(streams) {
+			if bytes.Compare(s, stream) == 0 {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Error("Expected the stream to always exist.")
+		}
+
+		res, err := es.Query(QueryRequest{Stream: stream})
+		if err != nil {
+			t.Fatal(err)
+		}
+		count = 0
+		for e := range(res) {
+			if bytes.Compare(events[count].Stream,
+			e.Stream) != 0 {
+				t.Error(count, "Stream not matching:")
+				t.Error("Expected:",
+				events[count].Stream)
+				t.Error("Was:", e.Stream)
+			}
+			if bytes.Compare(events[count].Id,
+			e.Id) != 0 {
+				t.Error(count, "Id not matching:")
+				t.Error("Expected:", events[count].Id)
+				t.Error("Was:", e.Id)
+			}
+			if bytes.Compare(events[count].Data, e.Data) != 0 {
+				t.Error(count, "Data not matching:")
+				t.Error("Expected:",
+				events[count].Data)
+				t.Error("Was:", e.Data)
+			}
+			count++
+		}
+		if len(events) != count {
+			t.Error("Wrong number of events:")
+			t.Error("Expected:", count)
+			t.Error("Was:     ", len(events))
+		}
+	}
+}
+
+func TestSingleAddAndQuery(t *testing.T) {
+	t.Parallel()
+
+	es, err := setupInMemoryeventstore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream := []byte("mystream")
+	testAddAndQuery(t, es, stream, 1)
+}
+
+func TestMultipleAddAndQuery(t *testing.T) {
+	t.Parallel()
+
+	es, err := setupInMemoryeventstore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream := []byte("mystream")
+	testAddAndQuery(t, es, stream, 2)
+}
+
+func TestMultipleStreamMultiAddAndQuery(t *testing.T) {
+	t.Parallel()
+
+	es, err := setupInMemoryeventstore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	streams := []StreamName{
+		StreamName("stream1"),
+		StreamName("stream2"),
+		StreamName("stream4"),
+		StreamName("stream11"),
+	}
+	for _, stream := range(streams) {
+		testAddAndQuery(t, es, stream, 5)
+	}
+}
+
+func testConcurrentAddAndQuery(t *testing.T) {
+	t.Parallel()
+
+	es, err := setupInMemoryeventstore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	streams := []StreamName{
+		StreamName("stream1"),
+		StreamName("stream2"),
+		StreamName("stream4"),
+		StreamName("stream11"),
+	}
+
+	wgroup := sync.WaitGroup{}
+	for _, stream := range(streams) {
+		wgroup.Add(1)
+		go func() {
+			testAddAndQuery(t, es, stream, 100)
+			wgroup.Done()
+		}()
+	}
+	wgroup.Wait()
 }
