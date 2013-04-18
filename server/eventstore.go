@@ -387,6 +387,9 @@ func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 		if bytes.Compare(curKey.groupKey, eventPrefix) != 0 {
 			break
 		}
+		if bytes.Compare(curKey.key, req.Stream) != 0 {
+			break
+		}
 
 		resEvent := StoredEvent{
 			curKey.groupKey,
@@ -395,9 +398,6 @@ func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 		}
 		res <- resEvent
 
-		if bytes.Compare(curKey.key, req.Stream) != 0 {
-			break
-		}
 		keyId := curKey.keyId.toBytes()
 		if req.ToId != nil && bytes.Compare(req.ToId, keyId) == 0 {
 			break
