@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"github.com/JensRantil/gorewind/server"
+	es "github.com/JensRantil/gorewind/eventstore"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
@@ -54,7 +55,7 @@ func main() {
 	}
 	defer stor.Close()
 
-	estore, err := server.NewEventStore(stor)
+	estore, err := es.NewEventStore(stor)
 	if err != nil {
 		log.Panicln(os.Stderr, "could not create event store")
 	}
