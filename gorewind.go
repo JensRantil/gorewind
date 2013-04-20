@@ -58,7 +58,6 @@ func main() {
 	if err != nil {
 		log.Panicln(os.Stderr, "could not create event store")
 	}
-	defer estore.Close()
 
 	initParams := server.InitParams{
 		Store: estore,
