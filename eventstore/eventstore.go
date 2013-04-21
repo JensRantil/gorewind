@@ -16,7 +16,7 @@
 
 // Deals with persisting events to disk and querying them. No network is
 // involved in any of the code in this package.
-package server
+package eventstore
 
 import (
 	"bytes"
