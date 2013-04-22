@@ -14,8 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Contains the server loop. Deals with incoming requests and delegates
-// them to the event store.
+// Contains the ZeroMQ server loop. Deals with incoming requests and
+// delegates them to the event store. Also publishes newly stored events
+// using a PUB socket.
+//
+// See README file for an up-to-date documentation of the ZeroMQ wire
+// format.
 package server
 
 import (
@@ -29,9 +33,15 @@ import (
 	es "github.com/JensRantil/gorewind/eventstore"
 )
 
+// StartParams are parameters required for starting the server. 
 type InitParams struct {
+	// The event store to use as backend.
 	Store *es.EventStore
+	// The ZeroMQ path that the command receiving socket will bind
+	// to.
 	CommandSocketZPath *string
+	// The ZeroMQ path that the event publishing socket will bind
+	// to.
 	EvPubSocketZPath *string
 }
 
@@ -69,7 +79,8 @@ func (v *Server) IsRunning() bool {
 	return v.running
 }
 
-// Stop stops the server.
+// Stop stops a running server. Blocks until the server is stopped. If
+// the server is not running, an error is returned.
 func (v* Server) Stop() error {
 	if v.IsRunning() {
 		return errors.New("Not running.")
