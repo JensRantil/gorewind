@@ -37,6 +37,8 @@ var (
 	" queries.")
 	eventPublishZPath = flag.String("evpubsocket",
 	"tcp://127.0.0.1:9003", "ZeroMQ event publishing socket.")
+	inMemoryStore = flag.Bool("in-memory", false,
+	"Use in-memory store. Useful for automated client testing.")
 )
 
 // Main method. Will panic if things are so bad that the application
@@ -49,11 +51,19 @@ func main() {
 	log.Println("Event publishing socket path:", *eventPublishZPath)
 	log.Println()
 
-	stor, err := storage.OpenFile(*eventStorePath)
-	if err != nil {
-		log.Panicln("could not create DB storage")
+	var stor storage.Storage
+	if *inMemoryStore {
+		log.Println("!!! WARNING: Using in-memory store.")
+		log.Println("!!! Events will not be persisted.")
+		log.Println()
+		stor = &storage.MemStorage{}
+	} else {
+		stor, err := storage.OpenFile(*eventStorePath)
+		if err != nil {
+			log.Panicln("could not create DB storage")
+		}
+		defer stor.Close()
 	}
-	defer stor.Close()
 
 	estore, err := eventstore.New(stor)
 	if err != nil {
