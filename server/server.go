@@ -30,13 +30,13 @@ import (
 	"time"
 	"sync"
 	zmq "github.com/alecthomas/gozmq"
-	es "github.com/JensRantil/gorewind/eventstore"
+	"github.com/JensRantil/gorewind/eventstore"
 )
 
 // StartParams are parameters required for starting the server. 
 type InitParams struct {
 	// The event store to use as backend.
-	Store *es.EventStore
+	Store *eventstore.EventStore
 	// The ZeroMQ path that the command receiving socket will bind
 	// to.
 	CommandSocketZPath *string
@@ -221,13 +221,13 @@ func stopPoller(cancelChan chan bool) {
 //
 // TODO: Make this a type function of `Server` to remove a lot of
 // parameters.
-func loopServer(estore *es.EventStore, evpubsock, frontend zmq.Socket,
+func loopServer(estore *eventstore.EventStore, evpubsock, frontend zmq.Socket,
 stop chan bool) {
 	toPoll := zmq.PollItems{
 		zmq.PollItem{Socket: frontend, zmq.Events: zmq.POLLIN},
 	}
 
-	pubchan := make(chan es.StoredEvent)
+	pubchan := make(chan eventstore.StoredEvent)
 	estore.RegisterPublishedEventsChannel(pubchan)
 	go publishAllSavedEvents(pubchan, evpubsock)
 
@@ -265,7 +265,7 @@ stop chan bool) {
 //
 // Pops previously stored messages off a channel and published them to a
 // ZeroMQ socket.
-func publishAllSavedEvents(toPublish chan es.StoredEvent, evpub zmq.Socket) {
+func publishAllSavedEvents(toPublish chan eventstore.StoredEvent, evpub zmq.Socket) {
 	msg := make(zMsg, 3)
 	for {
 		stored := <-toPublish
@@ -296,7 +296,7 @@ type zMsg [][]byte
 // The full request message stored in `msg` and the full ZeroMQ response
 // is pushed to `respchan`. The function does not return any error
 // because it is expected to be called asynchronously as a goroutine.
-func handleRequest(respchan chan zMsg, estore *es.EventStore, msg zMsg) {
+func handleRequest(respchan chan zMsg, estore *eventstore.EventStore, msg zMsg) {
 
 	// TODO: Rename to 'framelist'
 	parts := list.New()
@@ -337,8 +337,8 @@ func handleRequest(respchan chan zMsg, estore *es.EventStore, msg zMsg) {
 		} else {
 			estream := parts.Remove(parts.Front())
 			data := parts.Remove(parts.Front())
-			newevent := es.Event{
-				estream.(es.StreamName),
+			newevent := eventstore.Event{
+				estream.(eventstore.StreamName),
 				data.(zFrame),
 			}
 			newId, err := estore.Add(newevent)
@@ -371,7 +371,7 @@ func handleRequest(respchan chan zMsg, estore *es.EventStore, msg zMsg) {
 			fromid := parts.Remove(parts.Front())
 			toid := parts.Remove(parts.Front())
 
-			req := es.QueryRequest{
+			req := eventstore.QueryRequest{
 				Stream: estream.(zFrame),
 				FromId: fromid.(zFrame),
 				ToId: toid.(zFrame),
