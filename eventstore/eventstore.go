@@ -42,7 +42,7 @@ type EventStore struct {
 }
 
 // Create a new event store instance.
-func NewEventStore(stor storage.Storage) (*EventStore, error) {
+func New(stor storage.Storage) (*EventStore, error) {
 	estore := new(EventStore)
 
 	ePublishers := make(map[chan StoredEvent]chan StoredEvent)

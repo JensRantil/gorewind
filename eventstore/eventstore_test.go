@@ -28,7 +28,7 @@ import (
 
 func setupInMemoryeventstore() (es* EventStore, err error) {
 	stor := &storage.MemStorage{}
-	es, err = NewEventStore(stor)
+	es, err = New(stor)
 	return
 }
 
