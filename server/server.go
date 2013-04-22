@@ -257,11 +257,11 @@ stop chan bool) {
 func publishAllSavedEvents(toPublish chan es.StoredEvent, evpub zmq.Socket) {
 	msg := make(zMsg, 3)
 	for {
-		event := <-toPublish
+		stored := <-toPublish
 
-		msg[0] = event.Stream
-		msg[1] = event.Id
-		msg[2] = event.Data
+		msg[0] = stored.Event.Stream
+		msg[1] = stored.Id
+		msg[2] = stored.Event.Data
 
 		if err := evpub.SendMultipart(msg, 0); err != nil {
 			log.Println(err)
@@ -326,9 +326,9 @@ func handleRequest(respchan chan zMsg, estore *es.EventStore, msg zMsg) {
 		} else {
 			estream := parts.Remove(parts.Front())
 			data := parts.Remove(parts.Front())
-			newevent := es.UnstoredEvent{
-				Stream: estream.(es.StreamName),
-				Data: data.(zFrame),
+			newevent := es.Event{
+				estream.(es.StreamName),
+				data.(zFrame),
 			}
 			newId, err := estore.Add(newevent)
 			if err != nil {

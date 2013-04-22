@@ -107,9 +107,10 @@ func initStreamIdGenerator(db *leveldb.DB) (*streamIdGenerator, error) {
 }
 
 // An event that has not yet been persisted to disk.
-type UnstoredEvent struct {
+type Event struct {
 	// The name of the stream to which this event shall be stored.
 	Stream StreamName
+
 	// The data that is to be stored for this event. Can be an
 	// arbitrary byte slice.
 	Data []byte
@@ -117,14 +118,12 @@ type UnstoredEvent struct {
 
 // An event that has previously been persisted to disk.
 type StoredEvent struct {
-	// The name of the stream in which this event is stored.
-	Stream StreamName
 	// The ID for the stored event. No other event exists with name
 	// Stream and ID Id.
 	Id EventId
-	// The data stored for the event. Can be an arbitrary byte
-	// slice.
-	Data []byte
+
+	// The event that was persisted.
+	Event
 }
 
 // Register a channel where are published events will be pushed to.
@@ -142,7 +141,7 @@ type EventId []byte
 
 // Store an event to the event store. Returns the unique event id that
 // the event was stored under. As long as no error occurred, of course.
-func (v *EventStore) Add(event UnstoredEvent) (EventId, error) {
+func (v *EventStore) Add(event Event) (EventId, error) {
 	newId, err := v.idGenerator.Allocate(event.Stream)
 	if err != nil {
 		return nil, err
@@ -174,9 +173,8 @@ func (v *EventStore) Add(event UnstoredEvent) (EventId, error) {
 	}
 
 	storedEvent := StoredEvent{
-		Stream: event.Stream,
-		Id: []byte(newId),
-		Data: event.Data,
+		[]byte(newId),
+		event,
 	}
 
 	v.eventPublishersLock.RLock()
@@ -321,9 +319,11 @@ func safeQuery(i iter.Iterator, req QueryRequest, res chan StoredEvent) {
 		}
 
 		resEvent := StoredEvent{
-			Stream: curKey.key,
-			Id: curKey.keyId.toBytes(),
-			Data: []byte(i.Value()),
+			curKey.keyId.toBytes(),
+			Event{
+				curKey.key,
+				[]byte(i.Value()),
+			},
 		}
 		res <- resEvent
 

@@ -78,9 +78,9 @@ func randBytes(n int) []byte {
 func testAddAndQuery(t *testing.T, es *EventStore, stream StreamName, n int) {
 	events := make([]StoredEvent, 0, n)
 	for i := 0 ; i < n ; i++ {
-		testEvent := UnstoredEvent{
-			Stream: stream,
-			Data: randBytes(10),
+		testEvent := Event{
+			stream,
+			randBytes(10),
 		}
 		id, err := es.Add(testEvent)
 		for _, ev := range(events) {
@@ -90,9 +90,11 @@ func testAddAndQuery(t *testing.T, es *EventStore, stream StreamName, n int) {
 		}
 
 		events = append(events, StoredEvent{
-			Stream: stream,
-			Id: id,
-			Data: testEvent.Data,
+			id,
+			Event{
+				stream,
+				testEvent.Data,
+			},
 		})
 
 		count := 0
