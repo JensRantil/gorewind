@@ -26,10 +26,14 @@ import (
 )
 
 
-func setupInMemoryeventstore() (es* EventStore, err error) {
+func setupInMemoryeventstore() *EventStore {
 	stor := &storage.MemStorage{}
-	es, err = New(stor)
-	return
+	es, err := New(stor)
+	if err != nil {
+		// so that calling test does not have to deal with this.
+		panic(err)
+	}
+	return es
 }
 
 func popAllEvents(c chan StoredEvent, t *testing.T) (es []StoredEvent) {
@@ -43,10 +47,7 @@ func popAllEvents(c chan StoredEvent, t *testing.T) (es []StoredEvent) {
 func TestQueryingEmptyStream(t *testing.T) {
 	t.Parallel()
 
-	es, err := setupInMemoryeventstore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	es := setupInMemoryeventstore()
 
 	count := 0
 	streams := es.ListStreams(nil, 30)
@@ -146,10 +147,7 @@ func testAddAndQuery(t *testing.T, es *EventStore, stream StreamName, n int) {
 func TestSingleAddAndQuery(t *testing.T) {
 	t.Parallel()
 
-	es, err := setupInMemoryeventstore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	es := setupInMemoryeventstore()
 	stream := []byte("mystream")
 	testAddAndQuery(t, es, stream, 1)
 }
@@ -157,10 +155,7 @@ func TestSingleAddAndQuery(t *testing.T) {
 func TestMultipleAddAndQuery(t *testing.T) {
 	t.Parallel()
 
-	es, err := setupInMemoryeventstore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	es := setupInMemoryeventstore()
 	stream := []byte("mystream")
 	testAddAndQuery(t, es, stream, 2)
 }
@@ -168,10 +163,7 @@ func TestMultipleAddAndQuery(t *testing.T) {
 func TestMultipleStreamMultiAddAndQuery(t *testing.T) {
 	t.Parallel()
 
-	es, err := setupInMemoryeventstore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	es := setupInMemoryeventstore()
 	streams := []StreamName{
 		StreamName("stream1"),
 		StreamName("stream2"),
@@ -186,10 +178,7 @@ func TestMultipleStreamMultiAddAndQuery(t *testing.T) {
 func testConcurrentAddAndQuery(t *testing.T) {
 	t.Parallel()
 
-	es, err := setupInMemoryeventstore()
-	if err != nil {
-		t.Fatal(err)
-	}
+	es := setupInMemoryeventstore()
 	streams := []StreamName{
 		StreamName("stream1"),
 		StreamName("stream2"),
