@@ -82,7 +82,7 @@ func (v *Server) IsRunning() bool {
 // Stop stops a running server. Blocks until the server is stopped. If
 // the server is not running, an error is returned.
 func (v* Server) Stop() error {
-	if v.IsRunning() {
+	if !v.IsRunning() {
 		return errors.New("Not running.")
 	}
 
