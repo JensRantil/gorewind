@@ -175,10 +175,14 @@ func (v *Server) closeZmq() {
 	v.context = nil
 }
 
-func (v *Server) setRunningState(newState bool) {
+func (v *Server) setRunningState(newState bool) error {
 	v.runningMutex.Lock()
 	defer v.runningMutex.Unlock()
+	if v.running == newState {
+		return errors.New("Already is in running state.")
+	}
 	v.running = newState
+	return nil
 }
 
 // Runs the server that distributes requests to workers.
@@ -186,7 +190,10 @@ func (v *Server) setRunningState(newState bool) {
 // run the application correctly.
 func (v *Server) Start() error {
 	v.waiter.Add(1)
-	v.setRunningState(true)
+	if err := v.setRunningState(true); err != nil {
+		v.waiter.Done()
+		return err
+	}
 	go func() {
 		defer v.waiter.Done()
 		defer v.setRunningState(false)
