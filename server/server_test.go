@@ -85,12 +85,16 @@ func startStopServer(t *testing.T, serv *Server) {
 }
 
 func TestStartStop(t *testing.T) {
+	t.Parallel()
+
 	estore := setupInMemoryeventstore()
 	_, serv := getTestServer(estore)
 	startStopServer(t, serv)
 }
 
 func TestMultipleStartStop(t *testing.T) {
+	t.Parallel()
+
 	estore := setupInMemoryeventstore()
 	_, serv := getTestServer(estore)
 	for i:=0 ; i < 3 ; i++ {
