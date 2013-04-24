@@ -90,5 +90,5 @@ func main() {
 	go serverStopper()
 	signal.Notify(sigchan)
 
-	serv.Run()
+	serv.Start()
 }

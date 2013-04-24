@@ -173,7 +173,7 @@ func (v *Server) setRunningState(newState bool) {
 // Runs the server that distributes requests to workers.
 // Panics on error since it is an essential piece of code required to
 // run the application correctly.
-func (v *Server) Run() {
+func (v *Server) Start() {
 	v.setRunningState(true)
 	defer v.setRunningState(false)
 	loopServer((*v).params.Store, *(*v).evpubsock, *(*v).commandsock, v.stopChan)
