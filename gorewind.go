@@ -91,4 +91,5 @@ func main() {
 	signal.Notify(sigchan)
 
 	serv.Start()
+	serv.Wait()
 }

@@ -70,6 +70,7 @@ type Server struct {
 	runningMutex sync.Mutex
 	running bool
 	stopChan chan bool
+	waiter sync.WaitGroup
 }
 
 // IsRunning returns true if the server is running, false otherwise.
@@ -95,7 +96,7 @@ func (v* Server) Stop() error {
 	default:
 		return errors.New("Stop already signalled.")
 	}
-	<-v.stopChan
+	v.Wait()
 	// v.running is modified by Server.Run(...)
 
 	if v.IsRunning() {
@@ -119,6 +120,12 @@ func New(params *InitParams) (*Server, error) {
 	server := Server{
 		params: *params,
 		running: false,
+
+		// Using buffered channel of one (1) to properly check
+		// whether something has previously been buffered to
+		// this channel using select/default. See
+		// `Server.Stop()` for an example explanation.
+		stopChan: make(chan bool, 1),
 	}
 
 	var allOkay *bool = new(bool)
@@ -177,10 +184,15 @@ func (v *Server) setRunningState(newState bool) {
 // Runs the server that distributes requests to workers.
 // Panics on error since it is an essential piece of code required to
 // run the application correctly.
-func (v *Server) Start() {
+func (v *Server) Start() error {
+	v.waiter.Add(1)
 	v.setRunningState(true)
-	defer v.setRunningState(false)
-	loopServer((*v).params.Store, *(*v).evpubsock, *(*v).commandsock, v.stopChan)
+	go func() {
+		defer v.waiter.Done()
+		defer v.setRunningState(false)
+		loopServer((*v).params.Store, *(*v).evpubsock, *(*v).commandsock, v.stopChan)
+	}()
+	return nil
 }
 
 // The result of an asynchronous zmq.Poll call.
@@ -260,7 +272,6 @@ stop chan bool) {
 				log.Println(err)
 			}
 		case <- stop:
-			stop <- true
 			return
 		}
 	}
