@@ -129,13 +129,13 @@ func New(params *InitParams) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	server.context = &context
+	server.context = context
 
 	commandsock, err := context.NewSocket(zmq.ROUTER)
 	if err != nil {
 		return nil, err
 	}
-	server.commandsock = &commandsock
+	server.commandsock = commandsock
 	err = commandsock.Bind(*params.CommandSocketZPath)
 	if err != nil {
 		return nil, err
@@ -145,7 +145,7 @@ func New(params *InitParams) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	server.evpubsock = &evpubsock
+	server.evpubsock = evpubsock
 	if binderr := evpubsock.Bind(*params.EvPubSocketZPath); binderr != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ type zmqPollResult struct {
 func asyncPoll(notifier chan zmqPollResult, items zmq.PollItems, stop chan bool) {
 	for {
 		timeout := time.Duration(1)*time.Second
-		count, err := zmq.Poll(items, int64(timeout))
+		count, err := zmq.Poll(items, timeout)
 		if count > 0 || err != nil {
 			notifier <- zmqPollResult{err}
 		}
@@ -224,7 +224,7 @@ func stopPoller(cancelChan chan bool) {
 func loopServer(estore *eventstore.EventStore, evpubsock, frontend zmq.Socket,
 stop chan bool) {
 	toPoll := zmq.PollItems{
-		zmq.PollItem{Socket: frontend, zmq.Events: zmq.POLLIN},
+		zmq.PollItem{Socket: &frontend, zmq.Events: zmq.POLLIN},
 	}
 
 	pubchan := make(chan eventstore.StoredEvent)
