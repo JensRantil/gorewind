@@ -151,7 +151,7 @@ func New(params *InitParams) (*Server, error) {
 	}
 	server.evpubsock = evpubsock
 	if binderr := evpubsock.Bind(*params.EvPubSocketZPath); binderr != nil {
-		return nil, err
+		return nil, binderr
 	}
 
 	*allOkay = true
