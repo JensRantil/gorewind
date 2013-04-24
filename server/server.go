@@ -234,6 +234,7 @@ stop chan bool) {
 	pubchan := make(chan eventstore.StoredEvent)
 	estore.RegisterPublishedEventsChannel(pubchan)
 	go publishAllSavedEvents(pubchan, evpubsock)
+	defer close(pubchan)
 
 	pollchan := make(chan zmqPollResult)
 	respchan := make(chan zMsg)
@@ -271,9 +272,7 @@ stop chan bool) {
 // ZeroMQ socket.
 func publishAllSavedEvents(toPublish chan eventstore.StoredEvent, evpub zmq.Socket) {
 	msg := make(zMsg, 3)
-	for {
-		stored := <-toPublish
-
+	for stored := range(toPublish) {
 		msg[0] = stored.Event.Stream
 		msg[1] = stored.Id
 		msg[2] = stored.Event.Data
