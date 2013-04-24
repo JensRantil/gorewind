@@ -86,7 +86,7 @@ build Gorewind from code you need to do the following:
 
     $ git clone https://github.com/JensRantil/gorewind.git
     ...
-    $ go test -v ./server
+    $ go test -v ./...
     ... (make sure tests are not failing)
     $ go build
 
