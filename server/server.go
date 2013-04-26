@@ -279,6 +279,7 @@ stop chan bool) {
 				log.Println(err)
 			}
 		case <- stop:
+			log.Print("Server asked to stop. Stopping...")
 			return
 		}
 	}
