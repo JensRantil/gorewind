@@ -101,3 +101,25 @@ func TestMultipleStartStop(t *testing.T) {
 		startStopServer(t, serv)
 	}
 }
+
+func TestUnknownCommand(t *testing.T) {
+}
+
+func TestPublish(t *testing.T) {
+	// TODO: Assert an event was published
+}
+
+func TestMalformedPublish(t *testing.T) {
+}
+
+func TestBasicQuery(t *testing.T) {
+}
+
+func TestSlicedQuery(t *testing.T) {
+}
+
+func TestMalformedQuery(t *testing.T) {
+}
+
+func TestQueryingNonExistingEvent(t *testing.T) {
+}

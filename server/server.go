@@ -266,7 +266,7 @@ stop chan bool) {
 		select {
 		case res := <-pollchan:
 			if res.err != nil {
-				log.Print("Could not poll:", res.err)
+				log.Println("Could not poll:", res.err)
 			}
 			if res.err == nil && toPoll[0].REvents&zmq.POLLIN != 0 {
 				msg, _ := toPoll[0].Socket.RecvMultipart(0)
@@ -279,7 +279,7 @@ stop chan bool) {
 				log.Println(err)
 			}
 		case <- stop:
-			log.Print("Server asked to stop. Stopping...")
+			log.Println("Server asked to stop. Stopping...")
 			return
 		}
 	}
