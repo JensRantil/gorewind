@@ -89,6 +89,7 @@ func TestStartStop(t *testing.T) {
 
 	estore := setupInMemoryeventstore()
 	_, serv := getTestServer(estore)
+	defer serv.Close()
 	startStopServer(t, serv)
 }
 

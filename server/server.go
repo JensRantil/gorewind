@@ -86,6 +86,8 @@ func (v* Server) Wait() {
 
 // Stop stops a running server. Blocks until the server is stopped. If
 // the server is not running, an error is returned.
+//
+// Call Server.Close() if you are done with the server.
 func (v* Server) Stop() error {
 	if !v.IsRunning() {
 		return errors.New("Server not running.")
@@ -132,7 +134,7 @@ func New(params *InitParams) (*Server, error) {
 	*allOkay = false
 	defer func() {
 		if (!*allOkay) {
-			server.closeZmq()
+			server.Close()
 		}
 	}()
 
@@ -166,13 +168,25 @@ func New(params *InitParams) (*Server, error) {
 	return &server, nil
 }
 
-func (v *Server) closeZmq() {
-	(*v.evpubsock).Close()
-	v.evpubsock = nil
-	(*v.commandsock).Close()
-	v.commandsock = nil
-	(*v.context).Close()
-	v.context = nil
+// Clean up and server and deallocate resources.
+func (v *Server) Close() error {
+	if v.evpubsock != nil {
+		if err := (*v.evpubsock).Close(); err != nil {
+			return err
+		}
+		v.evpubsock = nil
+	}
+	if v.commandsock != nil {
+		if err := (*v.commandsock).Close(); err != nil {
+			return err
+		}
+		v.commandsock = nil
+	}
+	if v.context != nil {
+		v.context.Close()
+		v.context = nil
+	}
+	return nil
 }
 
 func (v *Server) setRunningState(newState bool) error {
