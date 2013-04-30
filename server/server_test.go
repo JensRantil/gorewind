@@ -75,7 +75,7 @@ func startStopServer(t *testing.T, serv *Server) {
 		t.Fatal(err)
 	}
 	if !serv.IsRunning() {
-		t.Error("Expected server to be running.")
+		t.Fatal("Expected server to be running.")
 	}
 	err := serv.Stop()
 	if err != nil {
