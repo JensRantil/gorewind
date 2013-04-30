@@ -71,7 +71,6 @@ func getTestServer(es *eventstore.EventStore) (*InitParams, *Server) {
 
 func startStopServer(t *testing.T, serv *Server) {
 	serv.Start()
-	//time.Sleep(1*time.Second/1000)
 	if !serv.IsRunning() {
 		t.Error("Expected server to be running.")
 	}
