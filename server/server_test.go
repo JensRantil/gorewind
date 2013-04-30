@@ -70,7 +70,10 @@ func getTestServer(es *eventstore.EventStore) (*InitParams, *Server) {
 }
 
 func startStopServer(t *testing.T, serv *Server) {
-	serv.Start()
+	err := serv.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !serv.IsRunning() {
 		t.Error("Expected server to be running.")
 	}
