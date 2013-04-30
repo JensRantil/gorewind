@@ -97,6 +97,7 @@ func TestMultipleStartStop(t *testing.T) {
 
 	estore := setupInMemoryeventstore()
 	_, serv := getTestServer(estore)
+	defer serv.Close()
 	for i:=0 ; i < 3 ; i++ {
 		startStopServer(t, serv)
 	}
