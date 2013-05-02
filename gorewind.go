@@ -25,6 +25,7 @@ import (
 	"github.com/JensRantil/gorewind/server"
 	"github.com/JensRantil/gorewind/eventstore"
 	"github.com/syndtr/goleveldb/leveldb/storage"
+	zmq "github.com/alecthomas/gozmq"
 )
 
 
@@ -70,10 +71,16 @@ func main() {
 		log.Panicln(os.Stderr, "could not create event store")
 	}
 
+	context, err := zmq.NewContext()
+	if err != nil {
+		log.Panicln(err)
+	}
+
 	initParams := server.InitParams{
 		Store: estore,
 		CommandSocketZPath: commandSocketZPath,
 		EvPubSocketZPath: eventPublishZPath,
+		ZMQContext: context,
 	}
 	serv, err := server.New(&initParams)
 	if err != nil {

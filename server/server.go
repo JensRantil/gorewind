@@ -43,12 +43,19 @@ type InitParams struct {
 	// The ZeroMQ path that the event publishing socket will bind
 	// to.
 	EvPubSocketZPath *string
+	// ZeroMQ context to use. While the context potentially could be
+	// instantiated by Server, it is not. Otherwise, it wuold be
+	// impossible to use inproc:// endpoints.
+	ZMQContext *zmq.Context
 }
 
 // Check all required initialization parameters are set.
 func checkAllInitParamsSet(p *InitParams) error {
 	if p.Store == nil {
 		return errors.New("Missing param: Store")
+	}
+	if p.ZMQContext == nil {
+		return errors.New("Missing ZeroMQ context.")
 	}
 	if p.CommandSocketZPath == nil {
 		return errors.New("Missing param: CommandSocketZPath")
@@ -138,13 +145,9 @@ func New(params *InitParams) (*Server, error) {
 		}
 	}()
 
-	context, err := zmq.NewContext()
-	if err != nil {
-		return nil, err
-	}
-	server.context = context
+	server.context = params.ZMQContext
 
-	commandsock, err := context.NewSocket(zmq.ROUTER)
+	commandsock, err := server.context.NewSocket(zmq.ROUTER)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +157,7 @@ func New(params *InitParams) (*Server, error) {
 		return nil, err
 	}
 
-	evpubsock, err := context.NewSocket(zmq.PUB)
+	evpubsock, err := server.context.NewSocket(zmq.PUB)
 	if err != nil {
 		return nil, err
 	}

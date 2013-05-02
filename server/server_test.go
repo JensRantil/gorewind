@@ -21,7 +21,7 @@ import (
 	"testing"
 	"strings"
 	"math/rand"
-//	zmq "github.com/alecthomas/gozmq"
+	zmq "github.com/alecthomas/gozmq"
 	"github.com/JensRantil/gorewind/eventstore"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 	//"time"
@@ -54,10 +54,15 @@ func getRandomInprocZMQPath() *string {
 }
 
 func getTestServer(es *eventstore.EventStore) (*InitParams, *Server) {
+	context, err := zmq.NewContext()
+	if err != nil {
+		panic(err)
+	}
 	initParams := InitParams{
 		Store: es,
 		CommandSocketZPath: getRandomInprocZMQPath(),
 		EvPubSocketZPath: getRandomInprocZMQPath(),
+		ZMQContext: context,
 	}
 	serv, err := New(&initParams)
 	if err != nil {
@@ -70,15 +75,13 @@ func getTestServer(es *eventstore.EventStore) (*InitParams, *Server) {
 }
 
 func startStopServer(t *testing.T, serv *Server) {
-	err := serv.Start()
-	if err != nil {
+	if err := serv.Start(); err != nil {
 		t.Fatal(err)
 	}
 	if !serv.IsRunning() {
 		t.Fatal("Expected server to be running.")
 	}
-	err := serv.Stop()
-	if err != nil {
+	if err := serv.Stop(); err != nil {
 		t.Error("Could not stop:", err)
 	}
 	if serv.IsRunning() {
