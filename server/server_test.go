@@ -74,14 +74,28 @@ func getTestServer(es *eventstore.EventStore) (*InitParams, *Server) {
 	return &initParams, serv
 }
 
-func startStopServer(t *testing.T, serv *Server) {
+func startTestServer(t *testing.T, serv *Server) {
 	if err := serv.Start(); err != nil {
 		t.Fatal(err)
 	}
 	if !serv.IsRunning() {
 		t.Fatal("Expected server to be running.")
 	}
+}
+
+func stopTestServer(t *testing.T, serv *Server) {
 	if err := serv.Stop(); err != nil {
+		t.Error("Could not stop test server.")
+	}
+	if err:=serv.Close(); err != nil {
+		t.Error(err)
+	}
+}
+
+func startStopServer(t *testing.T, serv *Server) {
+	startTestServer(t, serv)
+	err := serv.Stop()
+	if err != nil {
 		t.Error("Could not stop:", err)
 	}
 	if serv.IsRunning() {
@@ -106,6 +120,21 @@ func TestMultipleStartStop(t *testing.T) {
 	defer serv.Close()
 	for i:=0 ; i < 3 ; i++ {
 		startStopServer(t, serv)
+	}
+}
+
+func TestStartStart(t *testing.T) {
+	t.Parallel()
+
+	estore := setupInMemoryeventstore()
+	_, serv := getTestServer(estore)
+	defer serv.Close()
+	if err := serv.Start(); err != nil {
+		t.Error("Server could not be started.")
+	}
+	defer stopTestServer(t, serv)
+	if err := serv.Start(); err == nil {
+		t.Error("Server should not be able to start twice.")
 	}
 }
 
