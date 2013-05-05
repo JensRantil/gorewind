@@ -1,0 +1,4 @@
+before_install:
+- sudo apt-get install libzmq-dev
+language: go
+script: go test -v ./server
