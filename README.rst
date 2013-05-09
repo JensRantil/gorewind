@@ -16,7 +16,7 @@ Currently, this project is highly experimental and alpha.
 
 Other things:
 
-* Tests are exeucting using `make test`.
+* Tests are executed using `make test`.
 
 * I'll try to stick to http://www.semver.org when it comes to versioning.
 
