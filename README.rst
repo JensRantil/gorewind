@@ -16,7 +16,7 @@ Currently, this project is highly experimental and alpha.
 
 Other things:
 
-* Tests are exeucting using `go test -v ./server`.
+* Tests are exeucting using `make test`.
 
 * I'll try to stick to http://www.semver.org when it comes to versioning.
 
@@ -77,9 +77,9 @@ build Gorewind from code you need to do the following:
 
 1. Install Go 1.0 or 1.1.
 
-2. Make sure `libzmq` (ZeroMQ) version 2 is installed on the system
+2. Make sure `libzmq`/`libzmq3` (ZeroMQ) version 3 is installed on the system
    together with its development files. It has been tested to work with
-   version 2.2.
+   version 3.2.
 
 3. Ser up a `GOPATH` environment variable. You can read more about it here:
    http://golang.org/doc/code.html
@@ -87,10 +87,12 @@ build Gorewind from code you need to do the following:
 3. In terminal::
 
     $ git clone https://github.com/JensRantil/gorewind.git
+    $ go get -tags zmq_3_x github.com/alecthomas/gozmq
+    $ go get
     ...
-    $ go test -v ./...
+    $ make test
     ... (make sure tests are not failing)
-    $ go build
+    $ make build
 
 ...and voilá, `gorewind` binary should have been created.
 

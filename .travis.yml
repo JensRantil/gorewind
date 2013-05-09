@@ -1,4 +1,4 @@
 before_install:
 - sudo apt-get install libzmq3-dev
 language: go
-script: go test -v ./server
+script: make test
