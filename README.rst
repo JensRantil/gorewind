@@ -45,7 +45,7 @@ system into two parts:
 
 While not required, it is common to use messaging between the write and
 read sides. This means that the system will be in an inconsistent state
-from time to time. This is usually not an issue and came be overcome in
+from time to time. This is usually not an issue and can be overcome in
 various ways.
 
 A common pattern used together with CQRS is *event sourcing*. The
